@@ -1,0 +1,65 @@
+# The merge gate for stonedog-theme.
+#
+# Until now there was none (NEH-265): the repo was created empty, its first
+# commit bootstrapped it, and everything since has merged on a locally-run
+# gate. That is the same command CI runs, but it uses the author's machine,
+# node_modules and sibling checkouts — which is exactly the drift a hosted run
+# exists to catch. Three products depend on this package's colour resolution
+# and the repo is public, so a broken `main` here is visible to strangers.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push supersedes an in-flight run on the same branch. `main` is exempt:
+# its runs are the record of what landed, and cancelling one leaves a commit
+# with no verdict.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  gate:
+    name: Gate (typecheck, lint, unit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: stonedog-theme
+
+      # The token contract lives in the SIBLING repo, and the test that asserts
+      # we satisfy it imports the real list rather than a copy — copying is the
+      # drift that test exists to detect. jest and tsconfig both resolve
+      # `stonedog-style/contract` to ../stonedog-style/src/preset/semantic-variables.ts,
+      # so that checkout has to sit beside this one, at the same depth it does
+      # on a developer machine.
+      #
+      # No token needed: stonedog-style is public.
+      - uses: actions/checkout@v4
+        with:
+          repository: jesse-stonedog/stonedog-style
+          path: stonedog-style
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: stonedog-theme/package-lock.json
+
+      # `npm ci`, not `npm install` — it installs exactly the lockfile and fails
+      # if package.json has drifted from it, which is the difference between
+      # reproducing a build and approximating one.
+      - run: npm ci
+        working-directory: stonedog-theme
+
+      - run: npm run gate
+        working-directory: stonedog-theme
+
+      # The package ships a built dist/, unlike stonedog-style which ships
+      # source for Panda to parse. A green gate with a broken build would
+      # publish something no consumer can import, so the build is part of the
+      # bar rather than a release-time surprise.
+      - run: npm run build
+        working-directory: stonedog-theme
