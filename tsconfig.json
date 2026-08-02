@@ -18,7 +18,12 @@
     "skipLibCheck": true,
     "noEmit": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "paths": {
+      // See jest.config.cjs — the token contract comes from the sibling
+      // checkout rather than node_modules, so tsc has to agree with jest.
+      "stonedog-style/contract": ["../stonedog-style/src/preset/semantic-variables.ts"]
+    }
   },
   "//include": "test/ is included so @types/jest is in scope for the integration tier; excluding it runs the suite green while tsc fails on every matcher — the same trap stonedog-style documents.",
   "include": ["src/**/*.ts", "test/**/*.ts"],
