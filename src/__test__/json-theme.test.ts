@@ -116,6 +116,39 @@ describe("the JSON theme format", () => {
       expect(record?.borderDark).toBe("transparent");
     });
 
+    it("makes an explicitly transparent slot a real value (NEH-267)", () => {
+      // Written literally, "transparent" is the resolver's sentinel for UNSET —
+      // deliberately, so an unspoken slot leaves the var() palette fallback
+      // chain intact. But it is also a colour an author legitimately means: a
+      // plain button's background is transparent, and that is what makes it
+      // plain.
+      //
+      // Before this, writing the obvious thing produced NO property, failed the
+      // contract check, and gave no clue why. It cost a real debugging session
+      // on RozCards' theme.
+      const records = parseJsonTheme({
+        name: "T",
+        tokens: { buttonPlain: { bg: { light: "transparent", dark: "transparent" } } },
+      });
+      const plain = records.find((r) => r.name === "buttonPlain");
+      expect(plain?.bgLight).toBe("#00000000");
+
+      // The point of the translation: it actually emits now.
+      const vars = resolveTokensToCssVars(records, "light");
+      expect(vars["--hopper-button-plain-bg"]).toBe("#00000000");
+    });
+
+    it("still leaves a slot the file never mentions unset", () => {
+      // The other half. If the translation also applied to defaults, every
+      // unspoken slot would start emitting and override the palette fallback
+      // chain — which is the thing the sentinel exists to protect.
+      const vars = resolveTokensToCssVars(
+        parseJsonTheme({ name: "T", tokens: {} }),
+        "light",
+      );
+      expect(Object.keys(vars)).toHaveLength(0);
+    });
+
     it("feeds the same resolver the database path uses", () => {
       // The whole point of ComponentTokenRecord being the seam.
       const light = resolveTokensToCssVars(parseJsonTheme(minimal), "light");
