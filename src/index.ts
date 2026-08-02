@@ -1,4 +1,5 @@
 export * from "./logger";
+export * from "./json-theme";
 export * from "./types";
 export * from "./token-registry";
 export * from "./contrast";
