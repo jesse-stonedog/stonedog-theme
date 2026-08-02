@@ -125,6 +125,35 @@ export function validateJsonTheme(theme: unknown): string[] {
 }
 
 /**
+ * What an author writes vs what the resolver can be told.
+ *
+ * `"transparent"` is the resolver's sentinel for "this slot is unset", and that
+ * is deliberate rather than accidental: emitting `--x: transparent` would
+ * override the `var()` palette-fallback chain in semantic-variables.ts, so a
+ * slot a theme does not speak to has to emit *nothing at all*.
+ *
+ * But `"transparent"` is also a colour someone legitimately means — a plain
+ * button's background is transparent, and that is what makes it plain. Written
+ * literally in a theme file it produced no property, failed the contract check,
+ * and gave no clue why (NEH-267). It cost a real debugging session on RozCards'
+ * theme.
+ *
+ * So the loader translates: an author writes the obvious thing, and it becomes
+ * `#00000000` — the same pixel, but a *value*, which overrides the fallback the
+ * way an explicit choice should. The sentinel keeps its meaning; only slots the
+ * file omits are left unset.
+ *
+ * Not fixed in the resolver on purpose. Making it emit `transparent` would
+ * break that fallback chain for every existing HopperGuard theme, whose slots
+ * are stored with exactly this sentinel.
+ */
+const EXPLICIT_TRANSPARENT = "#00000000";
+
+function asValue(colour: string): string {
+  return colour === "transparent" ? EXPLICIT_TRANSPARENT : colour;
+}
+
+/**
  * A validated theme file as records the resolver understands.
  *
  * Starts from `buildDefaultTokenRecords`, so every registered token exists even
@@ -150,14 +179,17 @@ export function parseJsonTheme(
 
     return {
       ...record,
-      ...(source.bg && { bgLight: source.bg.light, bgDark: source.bg.dark }),
+      ...(source.bg && {
+        bgLight: asValue(source.bg.light),
+        bgDark: asValue(source.bg.dark),
+      }),
       ...(source.text && {
-        textLight: source.text.light,
-        textDark: source.text.dark,
+        textLight: asValue(source.text.light),
+        textDark: asValue(source.text.dark),
       }),
       ...(source.border && {
-        borderLight: source.border.light,
-        borderDark: source.border.dark,
+        borderLight: asValue(source.border.light),
+        borderDark: asValue(source.border.dark),
       }),
     };
   });
