@@ -1,0 +1,63 @@
+{
+  "name": "stonedog-theme",
+  "version": "0.1.0",
+  "description": "The theme layer for stonedog-style: component tokens, light/dark resolution, WCAG contrast validation, and the CSS custom properties a host must define.",
+  "license": "Apache-2.0",
+  "author": "StoneDogCode L.L.C.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jesse-stonedog/stonedog-theme.git"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "//dependencies": "ZERO runtime dependencies, and that is load-bearing. This package resolves colours and computes contrast ratios — arithmetic over plain objects. Every dependency added here is imposed on a public Apache-2.0 consumer, a proprietary SaaS, and an AGPLv3 one simultaneously. The private hopper-logger import this was extracted with is now the injectable seam in src/logger.ts.",
+  "//exports": "Unlike stonedog-style this ships a BUILT dist/, not source. Panda never parses it — it emits no CSS and defines no components, it produces a Record<string, string> of custom properties at runtime. So the reason stonedog-style ships source does not apply here.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext ts",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "gate": "npm run type-check && npm run lint && npm run test",
+    "version:bump:patch": "npm version patch --no-git-tag-version",
+    "version:bump:minor": "npm version minor --no-git-tag-version"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^24.13.2",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.11",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "design-system",
+    "theme",
+    "design-tokens",
+    "wcag",
+    "contrast",
+    "panda-css"
+  ]
+}

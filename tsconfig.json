@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "outDir": "./dist",
+    "strict": true,
+    // Deliberately NOT noUncheckedIndexedAccess / exactOptionalPropertyTypes
+    // yet, which is a divergence from stonedog-style. Turning them on surfaces
+    // 57 real errors across 6 files, mostly unguarded index access in
+    // extraction.ts and contrast.ts. Fixing those is worth doing and is NOT
+    // this extraction: mixing a hardening pass into a move makes the move
+    // unreviewable, and a move that changes behaviour is how a regression
+    // hides. Tracked separately.
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["jest", "node"]
+  },
+  "//include": "test/ is included so @types/jest is in scope for the integration tier; excluding it runs the suite green while tsc fails on every matcher — the same trap stonedog-style documents.",
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
