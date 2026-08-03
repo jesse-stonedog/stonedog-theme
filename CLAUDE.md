@@ -46,17 +46,22 @@ Landed: the pure core (types, token registry, contrast, resolver, migrator,
 recipe-contrast map, extraction) with its full test suite, building clean and
 depending on nothing.
 
-**Not yet built, and the package does not do its job without them:**
+Since landed as well:
 
-1. **The bridge to `stonedog-style`'s contract.** `requiredCssCustomProperties()`
-   there lists **44** properties. Nothing here asserts that a resolved theme
-   produces all 44, and **a token with no matching property renders as nothing,
-   silently** — no build error, no console warning. That assertion is the single
-   most valuable thing still missing.
-2. **The JSON loader** — RozCards and Optima have one theme each and want it in
-   a file, not a database.
+1. **The bridge to `stonedog-style`'s contract** (NEH-263).
+   `test/integration/token-contract.test.ts` imports
+   `requiredCssCustomProperties` from `stonedog-style/contract` and asserts a
+   resolved theme produces every one of them. This matters because **a token
+   with no matching property renders as nothing, silently** — no build error, no
+   console warning.
+2. **The JSON loader** — `src/json-theme.ts` (`validateJsonTheme`,
+   `parseJsonTheme`), for RozCards and Optima, which have one theme each and
+   want it in a file.
+
+**Still not built, and the package does not do its whole job without it:**
+
 3. **The database loader** — HopperGuard has many themes, edited through a
-   theme editor UI, and they must keep working.
+   theme editor UI, and they must keep working. Tracked in NEH-264.
 
 Note `buildDefaultTokenRecords()` returns 32 records whose every slot is
 `"transparent"`, and `resolveTokensToCssVars` on them yields **zero**
