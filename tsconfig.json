@@ -7,13 +7,15 @@
     "declaration": true,
     "outDir": "./dist",
     "strict": true,
-    // Deliberately NOT noUncheckedIndexedAccess / exactOptionalPropertyTypes
-    // yet, which is a divergence from stonedog-style. Turning them on surfaces
-    // 57 real errors across 6 files, mostly unguarded index access in
-    // extraction.ts and contrast.ts. Fixing those is worth doing and is NOT
-    // this extraction: mixing a hardening pass into a move makes the move
-    // unreviewable, and a move that changes behaviour is how a regression
-    // hides. Tracked separately.
+    // On since NEH-266, matching stonedog-style. This package parses hex
+    // colours, rgb() values, font stacks and Google Fonts URLs out of arbitrary
+    // remote CSS, so an index that is out of range or a capture group that did
+    // not participate is reachable input, not a theoretical one — and a
+    // contrast ratio computed from an undefined channel yields a plausible
+    // wrong number rather than a crash. Every unguarded access is now an error;
+    // handle the missing case, do not assert it away.
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,

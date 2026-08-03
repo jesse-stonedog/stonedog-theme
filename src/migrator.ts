@@ -56,6 +56,9 @@ export function resolveCssVarToHex(
   const varMatch = /var\(--colors-(\w+)-(\w+)\)/.exec(cssValue);
   if (varMatch) {
     const [, paletteKey, shade] = varMatch;
+    // A reference we cannot read both halves of resolves to nothing, which is
+    // this function's answer for every reference it cannot resolve.
+    if (paletteKey === undefined || shade === undefined) return null;
     return findHexInPalettes(paletteKey, shade, palettes);
   }
 
@@ -63,6 +66,7 @@ export function resolveCssVarToHex(
   const dottedMatch = /^colors\.(\w+)\.(\w+)$/.exec(cssValue);
   if (dottedMatch) {
     const [, paletteKey, shade] = dottedMatch;
+    if (paletteKey === undefined || shade === undefined) return null;
     return findHexInPalettes(paletteKey, shade, palettes);
   }
 

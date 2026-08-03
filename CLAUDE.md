@@ -101,11 +101,17 @@ completeness test has to run against a *populated* theme.
   encodes which text token is legible against which surface. Components already
   choose colours from it rather than by eye — read it before changing how pairs
   resolve.
-- **Strictness is looser here than in `stonedog-style`.**
-  `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` are off; turning
-  them on surfaces 57 real errors, mostly unguarded index access in
-  `extraction.ts` and `contrast.ts`. Worth fixing, deliberately not mixed into
-  the extraction.
+- **Strictness now matches `stonedog-style`.** `noUncheckedIndexedAccess` and
+  `exactOptionalPropertyTypes` are both on (NEH-266). Every index read and
+  regex capture group is therefore `T | undefined`: handle the missing case —
+  `null`/skip/throw, whatever that function already does for input it cannot
+  read — rather than reaching for `!`, `as`, or a widened type.
+- **`extraction.ts` has two known parsing bugs, both pre-existing and neither a
+  type error.** `categorizeColors` is blind to 3-char hex (its local `hexToRgb`
+  only accepts 6 chars, unlike `contrast.ts`'s), so a site written in `#fff`
+  shorthand extracts no neutrals; and `extractColorsFromCss` turns an
+  out-of-range `rgb(300,0,0)` into the malformed `#12c0000`. Both are tracked in
+  NEH-285 — do not "fix" them incidentally, they change extraction output.
 
 ## Testing
 

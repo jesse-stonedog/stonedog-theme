@@ -31,10 +31,18 @@ export function hexToRgb(hex: string): RgbColor | null {
     return null;
   }
 
+  const [, r, g, b] = result;
+  // All three groups are required by the pattern, so a match always fills
+  // them — but "not a colour we can read" is already this function's answer
+  // for anything it cannot parse, and that is the honest answer here too.
+  if (r === undefined || g === undefined || b === undefined) {
+    return null;
+  }
+
   return {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16),
+    r: parseInt(r, 16),
+    g: parseInt(g, 16),
+    b: parseInt(b, 16),
   };
 }
 
@@ -58,14 +66,20 @@ export function getLuminance(hexColor: string): number {
   const rgb = hexToRgb(hexColor);
   if (!rgb) return 0;
 
-  const [rs, gs, bs] = [rgb.r, rgb.g, rgb.b].map((c) => {
+  // Per-channel rather than map-then-destructure: a three-element array read
+  // back by index is three chances to silently multiply by undefined.
+  const toLinear = (c: number): number => {
     const sRGB = c / 255;
     return sRGB <= 0.03928
       ? sRGB / 12.92
       : Math.pow((sRGB + 0.055) / 1.055, 2.4);
-  });
+  };
 
-  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  return (
+    0.2126 * toLinear(rgb.r) +
+    0.7152 * toLinear(rgb.g) +
+    0.0722 * toLinear(rgb.b)
+  );
 }
 
 /**
@@ -138,7 +152,8 @@ export function findAAACompliantShade(
     .filter((item) => item.ratio >= aaaThreshold)
     .sort((a, b) => a.ratio - b.ratio);
 
-  return compliantShades.length > 0 ? compliantShades[0].shade : null;
+  const closest = compliantShades[0];
+  return closest ? closest.shade : null;
 }
 
 /**
@@ -160,14 +175,16 @@ export function suggestContrastFix(
     }))
     .filter((item) => item.ratio >= aaaThreshold);
 
-  if (compliantShades.length === 0) return null;
-
   compliantShades.sort(
     (a, b) =>
       Math.abs(a.luminance - fgLuminance) - Math.abs(b.luminance - fgLuminance),
   );
 
+  // One guard instead of a length check plus an unchecked [0]: an empty
+  // palette and a palette with nothing compliant are the same answer.
   const best = compliantShades[0];
+  if (!best) return null;
+
   const direction: "lighter" | "darker" =
     best.luminance > fgLuminance ? "lighter" : "darker";
 
