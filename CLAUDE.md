@@ -106,12 +106,16 @@ completeness test has to run against a *populated* theme.
   regex capture group is therefore `T | undefined`: handle the missing case —
   `null`/skip/throw, whatever that function already does for input it cannot
   read — rather than reaching for `!`, `as`, or a widened type.
-- **`extraction.ts` has two known parsing bugs, both pre-existing and neither a
-  type error.** `categorizeColors` is blind to 3-char hex (its local `hexToRgb`
-  only accepts 6 chars, unlike `contrast.ts`'s), so a site written in `#fff`
-  shorthand extracts no neutrals; and `extractColorsFromCss` turns an
-  out-of-range `rgb(300,0,0)` into the malformed `#12c0000`. Both are tracked in
-  NEH-285 — do not "fix" them incidentally, they change extraction output.
+- **There is exactly one hex parser: `src/color-math.ts`.** `contrast.ts`
+  re-exports `hexToRgb` / `rgbToHex` / `getLuminance` from it and `extraction.ts`
+  imports them; do not add a local copy to a third module. `extraction.ts` used
+  to carry its own, and the two drifted into a pair of silent bugs (NEH-285):
+  the private `hexToRgb` rejected 3-char hex, so a site written in `#fff`
+  shorthand scored every colour at luminance 0 and extracted **no neutrals and
+  default black text**; and the private `rgbToHex` never clamped, so
+  `rgb(300,0,0)` became the malformed `#12c0000` and was offered to the UI as a
+  selectable colour. Neither was a type error, which is why strictness never
+  caught them — only one implementation can.
 
 ## Testing
 

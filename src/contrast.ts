@@ -5,82 +5,16 @@
  * @see https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
  */
 
-import type { RgbColor, ContrastResult, ContrastPairResult } from "./types";
+import type { ContrastResult, ContrastPairResult } from "./types";
+import { hexToRgb, rgbToHex, getLuminance } from "./color-math";
 
 /**
- * Convert hex color string to RGB object.
- * Supports 3-char and 6-char hex with or without #.
+ * The hex ⇄ rgb primitives and the luminance formula now live in
+ * `color-math.ts`, shared with `extraction.ts` (NEH-285). They are re-exported
+ * here unchanged: this module has been their public home since the package was
+ * extracted, and callers should not have to know where the arithmetic moved.
  */
-export function hexToRgb(hex: string): RgbColor | null {
-  const cleanHex = hex.replace(/^#/, "");
-
-  const fullHex =
-    cleanHex.length === 3
-      ? cleanHex
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : cleanHex;
-
-  if (fullHex.length !== 6) {
-    return null;
-  }
-
-  const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex);
-  if (!result) {
-    return null;
-  }
-
-  const [, r, g, b] = result;
-  // All three groups are required by the pattern, so a match always fills
-  // them — but "not a colour we can read" is already this function's answer
-  // for anything it cannot parse, and that is the honest answer here too.
-  if (r === undefined || g === undefined || b === undefined) {
-    return null;
-  }
-
-  return {
-    r: parseInt(r, 16),
-    g: parseInt(g, 16),
-    b: parseInt(b, 16),
-  };
-}
-
-/**
- * Convert RGB object to hex string (with #).
- */
-export function rgbToHex(rgb: RgbColor): string {
-  const toHex = (n: number) => {
-    const hex = Math.round(Math.max(0, Math.min(255, n))).toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
-  };
-  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
-}
-
-/**
- * Calculate relative luminance per WCAG 2.1.
- * Accepts a hex string (e.g. "#3a5ba0").
- * @see https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
- */
-export function getLuminance(hexColor: string): number {
-  const rgb = hexToRgb(hexColor);
-  if (!rgb) return 0;
-
-  // Per-channel rather than map-then-destructure: a three-element array read
-  // back by index is three chances to silently multiply by undefined.
-  const toLinear = (c: number): number => {
-    const sRGB = c / 255;
-    return sRGB <= 0.03928
-      ? sRGB / 12.92
-      : Math.pow((sRGB + 0.055) / 1.055, 2.4);
-  };
-
-  return (
-    0.2126 * toLinear(rgb.r) +
-    0.7152 * toLinear(rgb.g) +
-    0.0722 * toLinear(rgb.b)
-  );
-}
+export { hexToRgb, rgbToHex, getLuminance };
 
 /**
  * Calculate contrast ratio between two hex colors.
