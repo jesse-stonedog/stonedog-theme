@@ -76,11 +76,27 @@ Since landed as well:
 2. **The JSON loader** — `src/json-theme.ts` (`validateJsonTheme`,
    `parseJsonTheme`), for RozCards and Optima, which have one theme each and
    want it in a file.
+3. **Typeface resolution** (NEH-277) — `resolveFontsToCssVars` emits
+   `--hopper-font-family-{body,heading,mono}` and
+   `--hopper-font-weight-{normal,medium,semibold,bold}`, and the JSON format
+   grew optional `fonts` / `fontWeights` blocks. Before it, type entered the
+   package twice (`ThemeConsumptionPayload.fonts`, `extraction.ts`) and left
+   through neither, and `fontWeight` did not appear here in any form.
 
 **Still not built, and the package does not do its whole job without it:**
 
-3. **The database loader** — HopperGuard has many themes, edited through a
+4. **The database loader** — HopperGuard has many themes, edited through a
    theme editor UI, and they must keep working. Tracked in NEH-264.
+5. **`stonedog-style` reading the font properties.** NEH-277 built the emitting
+   half only; no recipe reads a `--hopper-font-*` property yet, so a themed
+   typeface still stops at this package's edge. When that lands it must be
+   through a token carrying a **fallback** (the `SIZE_TOKENS` pattern in
+   `semantic-variables.ts`), *not* by joining `requiredCssCustomProperties()` —
+   an undefined colour paints an invisible element, but an undefined font falls
+   back to the browser's face and the page stays readable. Putting type in the
+   must-define list would break every existing host for no safety gain, and it
+   would change the `requiredCssCustomProperties().length ===
+   colorTokenNames().length` identity that both repos pin.
 
 Note `buildDefaultTokenRecords()` returns 32 records whose every slot is
 `"transparent"`, and `resolveTokensToCssVars` on them yields **zero**
@@ -93,6 +109,11 @@ completeness test has to run against a *populated* theme.
 - **Property names are not derivable from token names.** `textPrimary` is
   `--hopper-box-primary-text`, not `--hopper-text-primary`. Read
   `token-registry.ts`; guessing has already cost one full red test run.
+- **Font property names are spelled out: `--hopper-font-family-body`, not
+  `--hopper-font-body`.** Families and weights share the `--hopper-font-*`
+  namespace, and the longer form is what keeps a future role from shadowing a
+  weight step. Both are public API the moment they publish — adding a role is
+  backwards-compatible, renaming one silently un-styles whatever read it.
 - **The prefix is `hopper`, still.** `DEFAULT_CSS_VAR_PREFIX` in
   `stonedog-style` has not moved, because HopperGuard's theme data lives in a
   database keyed on `--hopper-*` and flipping it is a data migration, not a

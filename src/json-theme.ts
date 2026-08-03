@@ -1,6 +1,22 @@
 import { buildDefaultTokenRecords } from "./resolver";
-import { getTokenGroup } from "./token-registry";
-import type { ColorMode, ComponentTokenRecord, TokenSlot } from "./types";
+import {
+  FONT_ROLES,
+  FONT_WEIGHT_STEPS,
+  MIN_FONT_WEIGHT,
+  MAX_FONT_WEIGHT,
+  getTokenGroup,
+} from "./token-registry";
+import type {
+  ColorMode,
+  ComponentTokenRecord,
+  FontRole,
+  FontWeightStep,
+  ThemeFont,
+  ThemeFontSettings,
+  ThemeFonts,
+  ThemeFontWeights,
+  TokenSlot,
+} from "./types";
 
 /**
  * The JSON theme format — for hosts with one theme, not a theme editor.
@@ -14,6 +30,14 @@ import type { ColorMode, ComponentTokenRecord, TokenSlot } from "./types";
  * ```jsonc
  * {
  *   "name": "Supergirl",
+ *   "fonts": {
+ *     "body": {
+ *       "name": "Inter",
+ *       "fontFamily": "\"Inter\", sans-serif",
+ *       "googleFontUrl": "https://fonts.googleapis.com/css2?family=Inter"
+ *     }
+ *   },
+ *   "fontWeights": { "normal": 400, "bold": 700 },
  *   "tokens": {
  *     "boxPrimary": {
  *       "bg":     { "light": "#1e293b", "dark": "#0f172a" },
@@ -23,6 +47,11 @@ import type { ColorMode, ComponentTokenRecord, TokenSlot } from "./types";
  *   }
  * }
  * ```
+ *
+ * `fonts` and `fontWeights` are both optional and both new in NEH-277 — before
+ * it a JSON theme could not express a typeface at all, so a file-based host had
+ * no way to brand its type short of writing the CSS by hand. Omit them and
+ * nothing is emitted, which is what every theme written before this did.
  *
  * Slots a token does not use are omitted, not set to `"transparent"` — the
  * registry already knows which slots each token has (`activeSlots`), and making
@@ -41,9 +70,26 @@ export interface JsonThemeToken {
   border?: JsonThemeColor;
 }
 
+/**
+ * One typeface in a theme file.
+ *
+ * `name` is required rather than derived from the head of `fontFamily`. Pulling
+ * the first concrete family out of a stack is real parsing — `extraction.ts`
+ * already does it, for scraped CSS — and a second copy of that logic here is
+ * how this package got NEH-285. One extra word in a hand-written file is the
+ * cheaper trade.
+ */
+export interface JsonThemeFont {
+  name: string;
+  fontFamily: string;
+  googleFontUrl?: string | null;
+}
+
 export interface JsonTheme {
   name: string;
   tokens: Record<string, JsonThemeToken>;
+  fonts?: Record<string, JsonThemeFont>;
+  fontWeights?: Record<string, number>;
 }
 
 /** What went wrong, in terms a person can act on. */
@@ -63,6 +109,100 @@ const MODES: readonly ColorMode[] = ["light", "dark"];
 /** `#rgb`, `#rrggbb`, `#rrggbbaa`, or the explicit opt-out. */
 const COLOR = /^(#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6}|#[0-9a-fA-F]{8}|transparent)$/;
 
+function isFontRole(key: string): key is FontRole {
+  return (FONT_ROLES as readonly string[]).includes(key);
+}
+
+function isFontWeightStep(key: string): key is FontWeightStep {
+  return (FONT_WEIGHT_STEPS as readonly string[]).includes(key);
+}
+
+/**
+ * Everything wrong with a `fonts` block.
+ *
+ * An unknown role is rejected rather than ignored, for the reason an unknown
+ * token name is: the property it should have defined simply never appears, and
+ * the page renders in the browser's default face with nothing to explain why.
+ */
+function fontProblems(fonts: unknown): string[] {
+  if (fonts === undefined) return [];
+  if (typeof fonts !== "object" || fonts === null) {
+    return ["`fonts` must be an object"];
+  }
+
+  const problems: string[] = [];
+
+  for (const [role, font] of Object.entries(fonts)) {
+    if (!isFontRole(role)) {
+      problems.push(`unknown font role \`${role}\` (expected ${FONT_ROLES.join(", ")})`);
+      continue;
+    }
+    if (typeof font !== "object" || font === null) {
+      problems.push(`\`fonts.${role}\` must be an object`);
+      continue;
+    }
+
+    const candidate = font as Record<string, unknown>;
+
+    for (const field of ["name", "fontFamily"] as const) {
+      const value = candidate[field];
+      if (typeof value !== "string" || value.trim() === "") {
+        problems.push(`\`fonts.${role}.${field}\` must be a non-empty string`);
+      }
+    }
+
+    const url = candidate["googleFontUrl"];
+    if (url !== undefined && url !== null) {
+      // Absolute https only. This value ends up as the `href` of a `<link>` the
+      // host injects into its own document, and a theme file is the one place a
+      // hand-authored string gets that far — a relative path silently resolves
+      // against the wrong origin, and a `javascript:` URL is a scripting bug
+      // wearing a stylesheet's clothes.
+      if (typeof url !== "string" || !url.startsWith("https://")) {
+        problems.push(
+          `\`fonts.${role}.googleFontUrl\` must be an absolute https:// URL or null`,
+        );
+      }
+    }
+  }
+
+  return problems;
+}
+
+/** Everything wrong with a `fontWeights` block. */
+function fontWeightProblems(weights: unknown): string[] {
+  if (weights === undefined) return [];
+  if (typeof weights !== "object" || weights === null) {
+    return ["`fontWeights` must be an object"];
+  }
+
+  const problems: string[] = [];
+
+  for (const [step, weight] of Object.entries(weights)) {
+    if (!isFontWeightStep(step)) {
+      problems.push(
+        `unknown font weight \`${step}\` (expected ${FONT_WEIGHT_STEPS.join(", ")})`,
+      );
+      continue;
+    }
+    if (
+      typeof weight !== "number" ||
+      !Number.isInteger(weight) ||
+      weight < MIN_FONT_WEIGHT ||
+      weight > MAX_FONT_WEIGHT
+    ) {
+      // `"bold"` is the tempting thing to write here and it cannot work: the
+      // property feeds a `font-weight` declaration, and a keyword there would
+      // be re-resolved against the *host's* faces rather than the theme's.
+      problems.push(
+        `\`fontWeights.${step}\` must be an integer ${MIN_FONT_WEIGHT}–${MAX_FONT_WEIGHT}`,
+      );
+    }
+  }
+
+  return problems;
+}
+
 /**
  * Everything wrong with a theme file, in one pass.
  *
@@ -81,6 +221,12 @@ export function validateJsonTheme(theme: unknown): string[] {
   if (typeof candidate.name !== "string" || candidate.name.trim() === "") {
     problems.push("`name` must be a non-empty string");
   }
+
+  // Before the `tokens` early return below, so a file with a broken `tokens`
+  // block still reports its font problems in the same pass.
+  problems.push(...fontProblems(candidate.fonts));
+  problems.push(...fontWeightProblems(candidate.fontWeights));
+
   if (typeof candidate.tokens !== "object" || candidate.tokens === null) {
     problems.push("`tokens` must be an object");
     return problems;
@@ -193,4 +339,50 @@ export function parseJsonTheme(
       }),
     };
   });
+}
+
+/**
+ * The typeface half of a validated theme file, ready for `resolveFontsToCssVars`.
+ *
+ * Separate from `parseJsonTheme` rather than bolted onto its return value,
+ * because that function's contract is `ComponentTokenRecord[]` — the seam every
+ * loader meets the resolver at — and widening it would make the DB loader
+ * (NEH-264) return a shape it has no rows for. Colours and type resolve
+ * independently and merge into one map at the end.
+ *
+ * A file with no `fonts`/`fontWeights` yields empty records, not a throw: type
+ * is optional in a theme, and always has been.
+ *
+ * @throws {JsonThemeError} with every problem found, not just the first.
+ */
+export function parseJsonThemeFonts(theme: unknown): ThemeFontSettings {
+  const problems = validateJsonTheme(theme);
+  if (problems.length > 0) {
+    throw new JsonThemeError("invalid theme", problems);
+  }
+
+  const { fonts = {}, fontWeights = {} } = theme as JsonTheme;
+
+  const resolvedFonts: ThemeFonts = {};
+  for (const role of FONT_ROLES) {
+    const source = fonts[role];
+    if (!source) continue;
+
+    // Built field by field rather than spread, so an unrecognised key in the
+    // file cannot ride into the payload — and so `exactOptionalPropertyTypes`
+    // sees `googleFontUrl` omitted rather than present-and-undefined.
+    const font: ThemeFont = { name: source.name, fontFamily: source.fontFamily };
+    resolvedFonts[role] =
+      source.googleFontUrl === undefined
+        ? font
+        : { ...font, googleFontUrl: source.googleFontUrl };
+  }
+
+  const resolvedWeights: ThemeFontWeights = {};
+  for (const step of FONT_WEIGHT_STEPS) {
+    const weight = fontWeights[step];
+    if (weight !== undefined) resolvedWeights[step] = weight;
+  }
+
+  return { fonts: resolvedFonts, weights: resolvedWeights };
 }
