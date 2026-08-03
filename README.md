@@ -49,6 +49,43 @@ for (const [name, value] of Object.entries(vars)) {
 A theme carries both light and dark modes; `resolveTokensToCssVars` takes the
 mode you want, so switching schemes is re-resolving the same records.
 
+## Typefaces
+
+A theme's brand is its colours **and** its type, so families and weights resolve
+through the same seam rather than being applied by hand alongside it:
+
+```ts
+import { parseJsonThemeFonts, resolveFontsToCssVars, googleFontUrls } from "stonedog-theme"
+
+const fonts = parseJsonThemeFonts(myThemeJson)
+resolveFontsToCssVars(fonts)
+// -> { "--hopper-font-family-body": "\"Inter\", sans-serif", "--hopper-font-weight-bold": "700" }
+
+googleFontUrls(fonts)   // -> the stylesheets a <link> still has to load
+```
+
+Three roles — `body`, `heading`, `mono` — and four weight steps — `normal`,
+`medium`, `semibold`, `bold`, the ones `stonedog-style`'s recipes actually name.
+Fonts do not vary by colour mode, so unlike the colours this takes no mode;
+merge its output into the same map and write both together.
+
+Two things to be clear about:
+
+- **A role or step a theme omits emits nothing**, exactly as a `"transparent"`
+  colour slot does. Read them with a fallback —
+  `var(--hopper-font-family-body, inherit)` — and a theme with no opinion about
+  type leaves yours alone.
+- **`stonedog-style` does not consume these yet.** They are not in
+  `requiredCssCustomProperties()` and no recipe reads them, so today they are
+  inert unless *your* CSS reads them. That is deliberate: an undefined colour
+  paints an invisible element, but an undefined font falls back to the browser's
+  own face, so type belongs behind a fallback rather than in the list of
+  properties a host must define. Nothing you already ship has to change.
+
+`googleFontUrls` exists because a custom property can *name* a family but
+nothing in CSS can *fetch* one — that part stays a payload seam, and
+`ThemeConsumptionPayload.fonts` still carries it for database-backed hosts.
+
 ## Contrast validation
 
 Because the point of a themeable system is that someone *else* picks the
@@ -97,10 +134,15 @@ unshareable in the first place.
 ## Status
 
 The pure core is landed and tested: types, token registry, contrast, resolver,
-migrator, recipe-contrast map, extraction, and the JSON theme loader.
+migrator, recipe-contrast map, extraction, the JSON theme loader, and typeface
+resolution.
 
 The **database loader is not built yet**. If your themes live in a database
 rather than a file, this package does not yet cover you.
+
+**Typeface resolution is only this half of the job.** The properties resolve,
+but `stonedog-style` does not read them yet — a themed typeface reaches its
+components only once that lands, or once your own CSS reads the properties.
 
 ## Development
 

@@ -3,7 +3,7 @@
  * to legacy semantic variable names.
  */
 
-import type { ComponentTokenGroup, TokenSlot } from "./types";
+import type { ComponentTokenGroup, FontRole, FontWeightStep, TokenSlot } from "./types";
 
 /**
  * Convert a camelCase token name to kebab-case.
@@ -19,6 +19,55 @@ export function toKebabCase(str: string): string {
  */
 export function getCssVarName(tokenName: string, slot: TokenSlot): string {
   return `--hopper-${toKebabCase(tokenName)}-${slot}`;
+}
+
+/**
+ * Every typeface role, in the order a host should emit them.
+ *
+ * `body` first because it is the one every theme sets and the only one
+ * HopperGuard has ever set.
+ */
+export const FONT_ROLES: readonly FontRole[] = ["body", "heading", "mono"];
+
+/** Every weight step, lightest first. */
+export const FONT_WEIGHT_STEPS: readonly FontWeightStep[] = [
+  "normal",
+  "medium",
+  "semibold",
+  "bold",
+];
+
+/**
+ * The lowest and highest values CSS accepts for a numeric `font-weight`
+ * (CSS Fonts 4, §2.2.1). Outside this range the declaration is invalid and the
+ * browser discards it, so the property would be defined and still paint nothing
+ * — the exact failure mode this package exists to prevent. Shared by the
+ * resolver (which skips) and the JSON loader (which rejects) so the two cannot
+ * disagree about what a usable weight is.
+ */
+export const MIN_FONT_WEIGHT = 1;
+export const MAX_FONT_WEIGHT = 1000;
+
+/**
+ * The CSS custom property carrying a role's font stack.
+ * e.g. getFontFamilyCssVarName("body") -> "--hopper-font-family-body"
+ *
+ * `font-family` / `font-weight` are spelled out rather than compressed to
+ * `--hopper-font-body`, so the two namespaces cannot collide as roles or steps
+ * are added, and so the property names the CSS property it feeds. These names
+ * are public API from the moment they ship: adding one is backwards-compatible,
+ * changing one silently un-styles whatever read it.
+ */
+export function getFontFamilyCssVarName(role: FontRole): string {
+  return `--hopper-font-family-${role}`;
+}
+
+/**
+ * The CSS custom property carrying a weight step's numeric value.
+ * e.g. getFontWeightCssVarName("bold") -> "--hopper-font-weight-bold"
+ */
+export function getFontWeightCssVarName(step: FontWeightStep): string {
+  return `--hopper-font-weight-${step}`;
 }
 
 /**

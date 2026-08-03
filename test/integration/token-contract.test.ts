@@ -1,6 +1,13 @@
-import { requiredCssCustomProperties } from "stonedog-style/contract";
+import { colorTokenNames, requiredCssCustomProperties } from "stonedog-style/contract";
 
-import { resolveTokensToCssVars } from "../../src";
+import {
+  FONT_ROLES,
+  FONT_WEIGHT_STEPS,
+  getFontFamilyCssVarName,
+  getFontWeightCssVarName,
+  resolveFontsToCssVars,
+  resolveTokensToCssVars,
+} from "../../src";
 import { populatedTheme } from "../fixtures/populated-theme";
 
 /**
@@ -65,6 +72,49 @@ describe("the stonedog-style token contract", () => {
       requiredCssCustomProperties().length,
     );
     expect(Object.values(resolved).every((v) => v !== "transparent")).toBe(true);
+  });
+
+  it("does not make the font properties a host's problem", () => {
+    // The answer to "must hosts now define new custom properties?" — no
+    // (NEH-277).
+    //
+    // `requiredCssCustomProperties()` is the list a host MUST define or render
+    // nothing, and it is one property per colour token: that identity is pinned
+    // on stonedog-style's side too, and the issue is explicit that it may only
+    // change deliberately. Typefaces do not belong in it. An undefined colour
+    // paints an invisible element; an undefined font falls back to the
+    // browser's own face and the page stays readable — so when stonedog-style
+    // does consume these, it must be through a token carrying a fallback (the
+    // `SIZE_TOKENS` pattern), not by joining this list.
+    //
+    // The consequence, and the reason this assertion is here rather than in a
+    // comment: everything NEH-277 adds is inert until something reads it. That
+    // is what makes it safe to land alone, and what a follow-up in
+    // stonedog-style has to finish.
+    const required = requiredCssCustomProperties();
+
+    expect(required).toHaveLength(colorTokenNames().length);
+    for (const property of [
+      ...FONT_ROLES.map(getFontFamilyCssVarName),
+      ...FONT_WEIGHT_STEPS.map(getFontWeightCssVarName),
+    ]) {
+      expect(required).not.toContain(property);
+    }
+  });
+
+  it("adds font properties to a resolved theme without disturbing the colours", () => {
+    const colours = resolveTokensToCssVars(populatedTheme(), "light");
+    const merged = {
+      ...colours,
+      ...resolveFontsToCssVars({
+        fonts: { body: { name: "Inter", fontFamily: '"Inter", sans-serif' } },
+        weights: { bold: 700 },
+      }),
+    };
+    const missing = requiredCssCustomProperties().filter((property) => !(property in merged));
+
+    expect(missing).toEqual([]);
+    expect(merged["--hopper-font-family-body"]).toBe('"Inter", sans-serif');
   });
 
   it("resolves light and dark to different values", () => {

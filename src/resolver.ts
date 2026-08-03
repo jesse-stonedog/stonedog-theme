@@ -3,8 +3,23 @@
  * for client consumption.
  */
 
-import type { ComponentTokenRecord, ColorMode, FlatCssVariableMap } from "./types";
-import { getCssVarName, LEGACY_TO_TOKEN_MAP, COMPONENT_TOKEN_GROUPS } from "./token-registry";
+import type {
+  ComponentTokenRecord,
+  ColorMode,
+  FlatCssVariableMap,
+  ThemeFontSettings,
+} from "./types";
+import {
+  getCssVarName,
+  getFontFamilyCssVarName,
+  getFontWeightCssVarName,
+  FONT_ROLES,
+  FONT_WEIGHT_STEPS,
+  MIN_FONT_WEIGHT,
+  MAX_FONT_WEIGHT,
+  LEGACY_TO_TOKEN_MAP,
+  COMPONENT_TOKEN_GROUPS,
+} from "./token-registry";
 import { adjustForContrast, getContrastRatio } from "./contrast";
 import { themeLog } from "./logger";
 
@@ -97,6 +112,95 @@ export function resolveTokensToCssVars(
   }
 
   return vars;
+}
+
+/**
+ * Resolve a theme's typefaces into a flat CSS variable map (NEH-277).
+ *
+ * Produces variables like:
+ *   "--hopper-font-family-body": "\"Inter\", sans-serif"
+ *   "--hopper-font-weight-bold": "700"
+ *
+ * Fonts do not vary by colour mode — a theme does not change typeface between
+ * light and dark — so unlike `resolveTokensToCssVars` this takes no
+ * `ColorMode`. Merge its output into the same map: they are properties on the
+ * same element, and keeping them in one place is the whole point of routing
+ * type through the token layer instead of a bespoke `body { font-family }`
+ * rule written by each host.
+ *
+ * **A role or step the theme omits emits nothing**, exactly as a `"transparent"`
+ * colour slot does. That is what makes this additive: a host that consumes
+ * these properties with a fallback (`var(--hopper-font-family-body, inherit)`)
+ * keeps its own typeface until a theme has an opinion, and a host that consumes
+ * none of them is unaffected.
+ */
+export function resolveFontsToCssVars(settings: ThemeFontSettings): FlatCssVariableMap {
+  const fonts = settings.fonts ?? {};
+  const weights = settings.weights ?? {};
+
+  themeLog().info("[stonedog-theme/resolver] resolveFontsToCssVars", {
+    roles: FONT_ROLES.filter((role) => fonts[role] !== undefined),
+    steps: FONT_WEIGHT_STEPS.filter((step) => weights[step] !== undefined),
+  });
+
+  const vars: FlatCssVariableMap = {};
+
+  // Iterate the registry, never the caller's keys: a role the registry does not
+  // know has no property to emit, and copying unknown keys through would let a
+  // typo become a plausible-looking variable nothing reads. The JSON loader
+  // rejects such a key outright; a database row is merely skipped.
+  for (const role of FONT_ROLES) {
+    const font = fonts[role];
+    if (!font) continue;
+
+    const stack = font.fontFamily.trim();
+    if (stack === "") {
+      themeLog().warn("[stonedog-theme/resolver] skipped a font with an empty stack", {
+        role,
+        name: font.name,
+      });
+      continue;
+    }
+
+    vars[getFontFamilyCssVarName(role)] = stack;
+  }
+
+  for (const step of FONT_WEIGHT_STEPS) {
+    const weight = weights[step];
+    if (weight === undefined) continue;
+
+    if (!Number.isInteger(weight) || weight < MIN_FONT_WEIGHT || weight > MAX_FONT_WEIGHT) {
+      themeLog().warn("[stonedog-theme/resolver] skipped an out-of-range font weight", {
+        step,
+        weight,
+      });
+      continue;
+    }
+
+    vars[getFontWeightCssVarName(step)] = String(weight);
+  }
+
+  return vars;
+}
+
+/**
+ * The Google Fonts stylesheets a theme needs loaded, in role order, deduped.
+ *
+ * The one part of a typeface that is not a custom property. A stylesheet can
+ * *name* `"Inter"`, but something has to fetch it, and only a `<link>` or an
+ * `@import` can — so this stays a payload seam rather than becoming a variable.
+ * It is not a second theming mechanism: it is the loader for the first one.
+ */
+export function googleFontUrls(settings: ThemeFontSettings): string[] {
+  const fonts = settings.fonts ?? {};
+  const urls = new Set<string>();
+
+  for (const role of FONT_ROLES) {
+    const url = fonts[role]?.googleFontUrl;
+    if (url) urls.add(url);
+  }
+
+  return [...urls];
 }
 
 /**
