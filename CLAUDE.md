@@ -6,6 +6,25 @@ protocol, Node/nvm) live in `~/.claude/CLAUDE.md` and apply here as written.
 **This repo is public and Apache-2.0**, like `stonedog-style`. Never commit a
 credential, a customer name, or real theme data from a live product.
 
+## Published on npm
+
+`npm install stonedog-theme` — **0.1.0, published 2026-08-03** under the npm
+account `stonedogcode`, alongside `stonedog-style` at the same version.
+
+Unlike `stonedog-style`, this package ships a **built `dist/`**, so a consumer
+needs no Panda `include` glob and no `transpilePackages` entry — Panda never
+parses it. It emits no CSS and defines no components; it produces a
+`Record<string, string>` of custom properties at runtime.
+
+Releasing: `npm run gate`, then `npm run build` (tsup), then `npm publish
+--access public` from a clean `main` checkout. Needs a 2FA OTP or a granular
+token with bypass-2FA. A published version can never be reused.
+
+**Publishing 0.1.0 does not mean the package is finished** — the database theme
+loader (NEH-264) is still missing, so an app whose themes live in a database is
+not yet served. The README says so plainly; keep it that way rather than letting
+the npm listing imply more than is built.
+
 ## What this is
 
 `stonedog-style` owns *shape* — recipes, components, spacing, the type scale.
