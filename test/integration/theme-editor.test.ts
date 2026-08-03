@@ -21,22 +21,30 @@ import type { ComponentTokenRecord } from "../../src";
 // Helpers
 // ---------------------------------------------------------------------------
 
+interface ThemeColors {
+  primaryBg: string;
+  primaryText: string;
+  primaryBorder: string;
+  secondaryBg: string;
+  secondaryText: string;
+  secondaryBorder: string;
+  accentBg: string;
+  accentText: string;
+  accentBorder: string;
+}
+
+interface ThemeFixture {
+  name: string;
+  themeId: string;
+  colors: ThemeColors;
+}
+
 /**
  * Build a full 28-token set for a theme using provided hex palettes.
  */
 function buildThemeTokens(
   themeId: string,
-  colors: {
-    primaryBg: string;
-    primaryText: string;
-    primaryBorder: string;
-    secondaryBg: string;
-    secondaryText: string;
-    secondaryBorder: string;
-    accentBg: string;
-    accentText: string;
-    accentBorder: string;
-  },
+  colors: ThemeColors,
 ): ComponentTokenRecord[] {
   const p = colors;
   return [
@@ -89,7 +97,10 @@ const HEX_REGEX = /^#[0-9a-fA-F]{3,6}$/;
 // Theme fixtures
 // ---------------------------------------------------------------------------
 
-const themeFixtures = [
+// A non-empty tuple, not a plain array: several tests below read
+// `themeFixtures[0]`, and "there is always at least one fixture" is a fact
+// about this list worth stating in its type rather than re-checking at each use.
+const themeFixtures: [ThemeFixture, ...ThemeFixture[]] = [
   {
     name: "Blue Corporate",
     themeId: "blue-corp",
@@ -156,9 +167,15 @@ describe("ThemeEditor Data Flow Integration", () => {
       // The key used in COMPONENT_TOKEN_GROUPS is "boxPrimary" (NOT "boxBgPrimary")
       const boxPrimaryGroup = COMPONENT_TOKEN_GROUPS.find((g) => g.key === "boxPrimary");
       expect(boxPrimaryGroup).toBeDefined();
+      if (!boxPrimaryGroup) throw new Error("COMPONENT_TOKEN_GROUPS has no boxPrimary group");
 
-      const lookedUp = tokenMap[boxPrimaryGroup!.key];
+      const lookedUp = tokenMap[boxPrimaryGroup.key];
       expect(lookedUp).toBeDefined();
+      // The editor's whole failure mode is this lookup coming back empty and
+      // rendering "Not set", so stop here rather than checking slots on
+      // nothing — every assertion below would otherwise pass vacuously.
+      if (!lookedUp) throw new Error(`no token record for ${boxPrimaryGroup.key}`);
+
       expect(lookedUp.bgLight).toMatch(HEX_REGEX);
       expect(lookedUp.bgDark).toMatch(HEX_REGEX);
       expect(lookedUp.textLight).toMatch(HEX_REGEX);

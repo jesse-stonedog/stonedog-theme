@@ -46,19 +46,26 @@ function rgbToHex(r: number, g: number, b: number): string {
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
-    : null;
+  if (!result) return null;
+
+  const [, r, g, b] = result;
+  // Unparseable is already this function's null case; a match missing a group
+  // belongs there rather than becoming NaN channels downstream.
+  if (r === undefined || g === undefined || b === undefined) return null;
+
+  return { r: parseInt(r, 16), g: parseInt(g, 16), b: parseInt(b, 16) };
 }
 
 function getLuminance(hex: string): number {
   const rgb = hexToRgb(hex);
   if (!rgb) return 0;
-  const a = [rgb.r, rgb.g, rgb.b].map((v) => {
-    v /= 255;
+  const toLinear = (channel: number): number => {
+    const v = channel / 255;
     return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  });
-  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+  };
+  return (
+    toLinear(rgb.r) * 0.2126 + toLinear(rgb.g) * 0.7152 + toLinear(rgb.b) * 0.0722
+  );
 }
 
 function getSaturation(hex: string): number {
@@ -86,7 +93,11 @@ export function extractColorsFromCss(css: string): string[] {
 
   const rgbRegex = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g;
   while ((match = rgbRegex.exec(css)) !== null) {
-    colors.add(rgbToHex(parseInt(match[1]), parseInt(match[2]), parseInt(match[3])));
+    const [, r, g, b] = match;
+    // A declaration we cannot read all three channels of contributes no
+    // colour, the same as one that never matched.
+    if (r === undefined || g === undefined || b === undefined) continue;
+    colors.add(rgbToHex(parseInt(r), parseInt(g), parseInt(b)));
   }
 
   return Array.from(colors);
@@ -110,23 +121,24 @@ export function categorizeColors(colors: string[]): ExtractedColors {
   const highSaturation = saturatedColors.filter((c) => c.saturation > 0.3);
   const lowSaturation = saturatedColors.filter((c) => c.saturation <= 0.3);
 
-  if (highSaturation.length > 0) {
-    result.primary.push(highSaturation[0].hex);
-    if (highSaturation.length > 1) result.secondary.push(highSaturation[1].hex);
+  const [mostSaturated, nextSaturated] = highSaturation;
+  if (mostSaturated) {
+    result.primary.push(mostSaturated.hex);
+    if (nextSaturated) result.secondary.push(nextSaturated.hex);
     if (highSaturation.length > 2) result.accent = highSaturation.slice(2, 5).map((c) => c.hex);
   }
 
   result.neutral = lowSaturation.slice(0, 5).map((c) => c.hex);
 
-  const lightNeutrals = colorData
+  const lightestNeutral = colorData
     .filter((c) => c.saturation < 0.1 && c.luminance > 0.9)
-    .sort((a, b) => b.luminance - a.luminance);
-  if (lightNeutrals.length > 0) result.background = lightNeutrals[0].hex;
+    .sort((a, b) => b.luminance - a.luminance)[0];
+  if (lightestNeutral) result.background = lightestNeutral.hex;
 
-  const darkNeutrals = colorData
+  const darkestNeutral = colorData
     .filter((c) => c.saturation < 0.2 && c.luminance < 0.3)
-    .sort((a, b) => a.luminance - b.luminance);
-  if (darkNeutrals.length > 0) result.text = darkNeutrals[0].hex;
+    .sort((a, b) => a.luminance - b.luminance)[0];
+  if (darkestNeutral) result.text = darkestNeutral.hex;
 
   return result;
 }
@@ -162,9 +174,15 @@ function extractGoogleFontUrls(html: string, css: string): string[] {
   const urls = new Set<string>();
   const linkRegex = /<link[^>]+href=["']([^"']*fonts\.googleapis\.com[^"']*)["'][^>]*>/gi;
   let m: RegExpExecArray | null;
-  while ((m = linkRegex.exec(html)) !== null) urls.add(m[1].replace(/&amp;/g, "&"));
+  while ((m = linkRegex.exec(html)) !== null) {
+    const href = m[1];
+    if (href !== undefined) urls.add(href.replace(/&amp;/g, "&"));
+  }
   const importRegex = /@import\s+(?:url\()?["']?([^"')]*fonts\.googleapis\.com[^"')]*)["']?\)?/gi;
-  while ((m = importRegex.exec(css)) !== null) urls.add(m[1].replace(/&amp;/g, "&"));
+  while ((m = importRegex.exec(css)) !== null) {
+    const href = m[1];
+    if (href !== undefined) urls.add(href.replace(/&amp;/g, "&"));
+  }
   return Array.from(urls);
 }
 
@@ -174,8 +192,12 @@ function familiesFromGoogleUrl(url: string): string[] {
   const familyRegex = /[?&]family=([^&]+)/gi;
   let m: RegExpExecArray | null;
   while ((m = familyRegex.exec(url)) !== null) {
+    const value = m[1];
+    if (value === undefined) continue;
     // "Open+Sans:wght@400;700" → "Open Sans"
-    const name = decodeURIComponent(m[1]).split(":")[0].replace(/\+/g, " ").trim();
+    const [family] = decodeURIComponent(value).split(":");
+    if (family === undefined) continue;
+    const name = family.replace(/\+/g, " ").trim();
     if (name) families.push(name);
   }
   return families;
@@ -202,11 +224,13 @@ function firstConcreteFamily(stack: string): string | null {
 function primaryFontStack(css: string): string | null {
   const scoped =
     /(?:^|[},])\s*(?:body|html|:root)[^{]*\{[^}]*?font-family\s*:\s*([^;}]+)/i.exec(css);
-  if (scoped && firstConcreteFamily(scoped[1])) return scoped[1].trim();
+  const scopedStack = scoped?.[1];
+  if (scopedStack !== undefined && firstConcreteFamily(scopedStack)) return scopedStack.trim();
   const re = /font-family\s*:\s*([^;}]+)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(css)) !== null) {
-    if (firstConcreteFamily(m[1])) return m[1].trim();
+    const stack = m[1];
+    if (stack !== undefined && firstConcreteFamily(stack)) return stack.trim();
   }
   return null;
 }
@@ -272,8 +296,10 @@ export async function fetchPageStyles(url: string): Promise<{ html: string; css:
   const linkRegex = /<link[^>]+href=["']([^"']+\.css[^"']*)["'][^>]*>/gi;
   const cssLinks: string[] = [];
   while ((match = linkRegex.exec(html)) !== null && cssLinks.length < 3) {
+    const href = match[1];
+    if (href === undefined) continue;
     try {
-      cssLinks.push(new URL(match[1], parsedUrl.origin).toString());
+      cssLinks.push(new URL(href, parsedUrl.origin).toString());
     } catch {
       /* invalid URL, skip */
     }

@@ -203,6 +203,18 @@ describe("resolver", () => {
       return getContrastRatio(text, bg);
     }
 
+    /**
+     * A resolved var map legitimately omits keys (a "transparent" slot emits
+     * nothing), so a lookup is `string | undefined`. An absent var must fail
+     * the test — feeding `undefined` into a contrast ratio would score it as
+     * black and could pass by accident.
+     */
+    function emitted(vars: Record<string, string>, name: string): string {
+      const value = vars[name];
+      if (value === undefined) throw new Error(`expected ${name} to be emitted`);
+      return value;
+    }
+
     it.each(COLOR_MODES)(
       "raises a failing text/bg pair to >= 4.5:1 (%s mode)",
       (mode) => {
@@ -216,8 +228,8 @@ describe("resolver", () => {
           textDark: "#333333", // ~1.7:1 on black — fails AA
         });
         const vars = resolveTokensToCssVars([token], mode);
-        const bg = vars["--hopper-box-primary-bg"];
-        const text = vars["--hopper-box-primary-text"];
+        const bg = emitted(vars, "--hopper-box-primary-bg");
+        const text = emitted(vars, "--hopper-box-primary-text");
         expect(ratio(text, bg)).toBeGreaterThanOrEqual(4.5);
       },
     );
@@ -286,7 +298,7 @@ describe("resolver", () => {
       });
       const hopperVars = resolveTokensToCssVars([token], "light");
       const legacyVars = emitLegacyAliases([token], "light");
-      const adjustedText = hopperVars["--hopper-box-primary-text"];
+      const adjustedText = emitted(hopperVars, "--hopper-box-primary-text");
       // Find the legacy text alias for boxPrimary and confirm it matches.
       const legacyTextEntry = Object.entries(LEGACY_TO_TOKEN_MAP).find(
         ([, m]) => m.tokenName === "boxPrimary" && m.slot === "text",
