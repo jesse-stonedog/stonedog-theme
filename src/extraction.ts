@@ -11,6 +11,12 @@
  * runs unchanged in a Next route handler and a standalone tsx script.
  */
 
+// Hex parsing is shared with `contrast.ts` rather than reimplemented here
+// (NEH-285). The private copies this file used to carry had drifted from the
+// shared ones: they rejected 3-char shorthand — which `extractColorsFromCss`
+// deliberately collects — and never clamped an rgb() channel to 0–255.
+import { hexToRgb, rgbToHex, getLuminance } from "./color-math";
+
 export interface ExtractedColors {
   primary: string[];
   secondary: string[];
@@ -39,34 +45,6 @@ export interface ExtractedTheme {
 }
 
 // ── Color parsing ─────────────────────────────────────────
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
-}
-
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return null;
-
-  const [, r, g, b] = result;
-  // Unparseable is already this function's null case; a match missing a group
-  // belongs there rather than becoming NaN channels downstream.
-  if (r === undefined || g === undefined || b === undefined) return null;
-
-  return { r: parseInt(r, 16), g: parseInt(g, 16), b: parseInt(b, 16) };
-}
-
-function getLuminance(hex: string): number {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return 0;
-  const toLinear = (channel: number): number => {
-    const v = channel / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  return (
-    toLinear(rgb.r) * 0.2126 + toLinear(rgb.g) * 0.7152 + toLinear(rgb.b) * 0.0722
-  );
-}
 
 function getSaturation(hex: string): number {
   const rgb = hexToRgb(hex);
@@ -97,7 +75,7 @@ export function extractColorsFromCss(css: string): string[] {
     // A declaration we cannot read all three channels of contributes no
     // colour, the same as one that never matched.
     if (r === undefined || g === undefined || b === undefined) continue;
-    colors.add(rgbToHex(parseInt(r), parseInt(g), parseInt(b)));
+    colors.add(rgbToHex({ r: parseInt(r, 10), g: parseInt(g, 10), b: parseInt(b, 10) }));
   }
 
   return Array.from(colors);
