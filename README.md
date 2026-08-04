@@ -1,6 +1,6 @@
 # stonedog-theme
 
-The theme layer for [`stonedog-style`](https://github.com/jesse-stonedog/stonedog-style).
+The theme layer for [`stonedog-style`](https://github.com/stonedog-code/stonedog-style).
 
 `stonedog-style` owns *shape* — recipes, components, spacing, the type scale —
 and knows **no colours at all**. Every colour there is a Panda token whose value
