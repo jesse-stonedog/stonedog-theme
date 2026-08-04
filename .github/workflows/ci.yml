@@ -39,7 +39,7 @@ jobs:
       # No token needed: stonedog-style is public.
       - uses: actions/checkout@v4
         with:
-          repository: jesse-stonedog/stonedog-style
+          repository: stonedog-code/stonedog-style
           path: stonedog-style
 
       - uses: actions/setup-node@v4

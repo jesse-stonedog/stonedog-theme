@@ -6,7 +6,7 @@
   "author": "StoneDogCode L.L.C.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jesse-stonedog/stonedog-theme.git"
+    "url": "git+https://github.com/stonedog-code/stonedog-theme.git"
   },
   "type": "module",
   "sideEffects": false,
