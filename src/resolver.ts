@@ -21,6 +21,7 @@ import {
   LEGACY_TO_TOKEN_MAP,
   COMPONENT_TOKEN_GROUPS,
 } from "./token-registry";
+import { isTranslucent } from "./color-math";
 import { adjustForContrast, getContrastRatio } from "./contrast";
 import { themeLog } from "./logger";
 
@@ -44,6 +45,14 @@ export const AA_NORMAL_TEXT_RATIO = 4.5;
  * Centralizing the floor here means EVERY theme and BOTH color modes inherit
  * AA contrast automatically; a new or edited theme can't ship a failing
  * token/text pair.
+ *
+ * **A translucent slot is skipped rather than adjusted** (NEH-424). Its rendered
+ * colour depends on whatever is painted behind it, which this function cannot
+ * see, so there is no ratio to hold it to — `getContrastRatio` will return a
+ * number, but that number describes an opaque colour nobody is looking at.
+ * Rewriting a designer's text colour on that basis is worse than leaving it: the
+ * result is neither what they chose nor actually compliant, and nothing in the
+ * output says it happened. The warning is the honest half.
  */
 export function resolveTokenSlots(
   token: ComponentTokenRecord,
@@ -54,7 +63,12 @@ export function resolveTokenSlots(
   let text = isLight ? token.textLight : token.textDark;
   const border = isLight ? token.borderLight : token.borderDark;
 
-  if (
+  if (bg && text && (isTranslucent(bg) || isTranslucent(text)) && bg !== "transparent" && text !== "transparent") {
+    themeLog().warn(
+      "[stonedog-theme/resolver] skipped the AA contrast floor for a translucent slot",
+      { token: token.name, colorMode, bg, text },
+    );
+  } else if (
     bg &&
     bg !== "transparent" &&
     text &&

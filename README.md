@@ -149,6 +149,11 @@ unshareable in the first place.
   `--hopper-*`, and flipping the default is a data migration, not a rename.
   Tracked separately. Choosing a prefix and changing the default are different
   questions; only the second one is parked.
+- **Colours may be 3-, 6- or 8-char hex, or `transparent`.** 8-char carries
+  alpha. A translucent colour is emitted as written, but it is **exempt from the
+  AA contrast floor** — what it renders as depends on whatever is painted behind
+  it, which this package cannot see, so there is no ratio to hold it to. The
+  resolver logs when it skips one. `rgba()` is not accepted; write `#rrggbbaa`.
 - **A token with no matching property renders as nothing, silently** — no build
   error, no console warning. That is the failure mode this package exists to
   make impossible, and it is why the completeness assertion against
