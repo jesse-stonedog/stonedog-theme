@@ -3,7 +3,7 @@
  * Used by integration tests to verify WCAG AAA contrast compliance per theme.
  */
 
-import { LEGACY_TO_TOKEN_MAP, getCssVarName } from "./token-registry";
+import { DEFAULT_CSS_VAR_PREFIX, LEGACY_TO_TOKEN_MAP, getCssVarName } from "./token-registry";
 
 export interface RecipeContrastPair {
   recipe: string;
@@ -17,11 +17,19 @@ export interface RecipeContrastPair {
  * (e.g. "--hopper-button-primary-text") using the LEGACY_TO_TOKEN_MAP.
  *
  * Returns null if the semantic name is not in the legacy map.
+ *
+ * Takes `cssVarPrefix` so a contrast check can look up the properties a theme
+ * actually emitted (NEH-423). Under a non-default prefix the lookup would
+ * otherwise miss every one of them — and a contrast checker that finds no pairs
+ * reports no failures, which reads exactly like a pass.
  */
-export function semanticTokenToCssVar(semanticName: string): string | null {
+export function semanticTokenToCssVar(
+  semanticName: string,
+  cssVarPrefix: string = DEFAULT_CSS_VAR_PREFIX,
+): string | null {
   const entry = LEGACY_TO_TOKEN_MAP[semanticName];
   if (!entry) return null;
-  return getCssVarName(entry.tokenName, entry.slot);
+  return getCssVarName(entry.tokenName, entry.slot, cssVarPrefix);
 }
 
 /**

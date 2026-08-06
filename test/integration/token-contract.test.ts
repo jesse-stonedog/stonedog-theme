@@ -95,8 +95,10 @@ describe("the stonedog-style token contract", () => {
 
     expect(required).toHaveLength(colorTokenNames().length);
     for (const property of [
-      ...FONT_ROLES.map(getFontFamilyCssVarName),
-      ...FONT_WEIGHT_STEPS.map(getFontWeightCssVarName),
+      // Wrapped, not point-free: the prefix argument (NEH-423) sits where
+      // `map` puts the index, and the compiler rejects the bare form.
+      ...FONT_ROLES.map((role) => getFontFamilyCssVarName(role)),
+      ...FONT_WEIGHT_STEPS.map((step) => getFontWeightCssVarName(step)),
     ]) {
       expect(required).not.toContain(property);
     }
@@ -115,6 +117,53 @@ describe("the stonedog-style token contract", () => {
 
     expect(missing).toEqual([]);
     expect(merged["--hopper-font-family-body"]).toBe('"Inter", sans-serif');
+  });
+
+  describe.each(MODES)("under a custom cssVarPrefix, in %s mode", (mode) => {
+    // The other half of the prefix contract (NEH-423). The test above proves
+    // stonedog-style ASKS for `--optima-*` when told to; this proves this
+    // package PRODUCES them. Both halves passing separately is exactly the
+    // state Optima was already in — the preset re-pointed and the resolver did
+    // not — and it renders as a page with no colour on it at all.
+    it("produces every required property under that prefix", () => {
+      const produced = new Set(
+        Object.keys(resolveTokensToCssVars(populatedTheme(), mode, "optima")),
+      );
+      const missing = requiredCssCustomProperties("optima").filter(
+        (property) => !produced.has(property),
+      );
+
+      expect(missing).toEqual([]);
+    });
+
+    it("produces nothing under the default prefix", () => {
+      // Without this, a resolver that emitted BOTH namespaces would pass the
+      // assertion above. That would look like it worked and would quietly
+      // double the size of every theme payload.
+      const produced = Object.keys(resolveTokensToCssVars(populatedTheme(), mode, "optima"));
+
+      expect(produced.every((property) => property.startsWith("--optima-"))).toBe(true);
+    });
+  });
+
+  it("re-points fonts with the same prefix as the colours", () => {
+    // Colours and fonts land on one element, so a host that got one namespace
+    // and not the other is half-themed — and the half that went missing is the
+    // silent one, since an undefined font falls back to the browser's face.
+    const merged = {
+      ...resolveTokensToCssVars(populatedTheme(), "light", "optima"),
+      ...resolveFontsToCssVars(
+        {
+          fonts: { body: { name: "Inter", fontFamily: '"Inter", sans-serif' } },
+          weights: { bold: 700 },
+        },
+        "optima",
+      ),
+    };
+
+    expect(merged["--optima-font-family-body"]).toBe('"Inter", sans-serif');
+    expect(merged["--optima-font-weight-bold"]).toBe("700");
+    expect(merged["--hopper-font-family-body"]).toBeUndefined();
   });
 
   it("resolves light and dark to different values", () => {
