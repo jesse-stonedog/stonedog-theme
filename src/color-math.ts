@@ -19,7 +19,24 @@ import type { RgbColor } from "./types";
 
 /**
  * Convert hex color string to RGB object.
- * Supports 3-char and 6-char hex with or without #.
+ * Supports 3-, 6- and 8-char hex with or without #.
+ *
+ * **8-char hex carries alpha, and this drops it** (NEH-424). The channels are
+ * what luminance is computed from, and alpha is not one of them — but a caller
+ * deciding whether a contrast ratio is *meaningful* needs to know it was there,
+ * which is what `hexAlpha` below is for.
+ *
+ * The 8-char case was not merely unsupported, it was actively wrong: the length
+ * check rejected it, `getLuminance` returned its `0` fallback, and every
+ * translucent colour therefore scored **identically to pure black** — a 10%
+ * black overlay reported a perfect 21:1 against white. Meanwhile
+ * `validateJsonTheme` accepted 8-char hex all along, so a theme could carry one,
+ * validate clean, and silently poison every contrast check it appeared in.
+ *
+ * That is the same defect as NEH-285, which the header above describes: a colour
+ * one half of the package accepts and the other half misreads as black. Adding
+ * a length to the regex is the fix; noticing that acceptance and parsing must
+ * agree is the lesson.
  */
 export function hexToRgb(hex: string): RgbColor | null {
   const cleanHex = hex.replace(/^#/, "");
@@ -30,7 +47,11 @@ export function hexToRgb(hex: string): RgbColor | null {
           .split("")
           .map((c) => c + c)
           .join("")
-      : cleanHex;
+      : // 8-char is 6 channels plus 2 of alpha. Slicing rather than widening the
+        // regex below keeps that pattern describing exactly three channels.
+        cleanHex.length === 8
+        ? cleanHex.slice(0, 6)
+        : cleanHex;
 
   if (fullHex.length !== 6) {
     return null;
@@ -54,6 +75,42 @@ export function hexToRgb(hex: string): RgbColor | null {
     g: parseInt(g, 16),
     b: parseInt(b, 16),
   };
+}
+
+/**
+ * A colour's alpha channel, 0–1. Opaque notations return 1; unreadable input
+ * returns null, matching `hexToRgb`'s answer for the same.
+ *
+ * Exists so contrast code can tell "this is opaque" from "this is 10% of a
+ * colour over something I cannot see" (NEH-424). Those are not the same
+ * question and only one of them has a WCAG answer.
+ */
+export function hexAlpha(hex: string): number | null {
+  const cleanHex = hex.replace(/^#/, "");
+
+  if (/^[a-f\d]{3}$/i.test(cleanHex) || /^[a-f\d]{6}$/i.test(cleanHex)) return 1;
+  if (/^[a-f\d]{8}$/i.test(cleanHex)) return parseInt(cleanHex.slice(6, 8), 16) / 255;
+
+  return null;
+}
+
+/**
+ * Whether a colour is anything less than fully opaque.
+ *
+ * **A contrast ratio involving a translucent colour is not defined** — the
+ * rendered colour depends on whatever is painted behind it, which nothing in
+ * this package can see. Callers use this to decline to answer rather than to
+ * answer wrongly; `getContrastRatio` treats such a colour as if it were opaque,
+ * which is a useful approximation and a bad basis for changing anyone's colour.
+ *
+ * `"transparent"` counts, and deliberately so. It is the resolver's sentinel
+ * for an unset slot, and an unset slot has no colour to score either.
+ */
+export function isTranslucent(colour: string): boolean {
+  if (colour === "transparent") return true;
+
+  const alpha = hexAlpha(colour);
+  return alpha !== null && alpha < 1;
 }
 
 /**

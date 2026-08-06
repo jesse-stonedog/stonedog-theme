@@ -76,3 +76,58 @@ describe("getLuminance", () => {
     expect(colorMath.getLuminance("#fff")).toBeCloseTo(1, 10);
   });
 });
+
+/**
+ * NEH-424: 8-char hex carries alpha, and `validateJsonTheme` has accepted it
+ * all along — but `hexToRgb` rejected it on length, so `getLuminance` fell back
+ * to 0 and every translucent colour scored EXACTLY as pure black.
+ *
+ * The shape is NEH-285's, one layer along: a colour one half of the package
+ * accepts and the other half silently misreads. It is worse here, because the
+ * wrong answer is not "no colour" but a confident, plausible number — a 10%
+ * black overlay reported a flawless 21:1 against white, and a contrast gate
+ * reading that would pass it and say so.
+ */
+describe("8-char hex (alpha)", () => {
+  it("parses the colour channels instead of returning null", () => {
+    expect(colorMath.hexToRgb("#14181c1a")).toEqual({ r: 0x14, g: 0x18, b: 0x1c });
+  });
+
+  it("scores by its channels, not as black", () => {
+    // The regression. Both of these were 0 before, so the ratio below was 21.
+    expect(colorMath.getLuminance("#14181c1a")).toBe(colorMath.getLuminance("#14181c"));
+    expect(colorMath.getLuminance("#14181c1a")).not.toBe(colorMath.getLuminance("#000000"));
+  });
+
+  it("no longer reports a translucent overlay as a perfect contrast", () => {
+    expect(contrast.getContrastRatio("#ffffff", "#14181c1a")).toBeLessThan(21);
+    expect(contrast.getContrastRatio("#ffffff", "#14181c1a")).toBe(
+      contrast.getContrastRatio("#ffffff", "#14181c"),
+    );
+  });
+
+  it("reads the alpha channel back as 0–1", () => {
+    expect(colorMath.hexAlpha("#14181c00")).toBe(0);
+    expect(colorMath.hexAlpha("#14181cff")).toBe(1);
+    expect(colorMath.hexAlpha("#14181c1a")).toBeCloseTo(0x1a / 255, 10);
+  });
+
+  it("calls opaque notations opaque and unreadable ones null", () => {
+    expect(colorMath.hexAlpha("#fff")).toBe(1);
+    expect(colorMath.hexAlpha("#14181c")).toBe(1);
+    expect(colorMath.hexAlpha("not-a-color")).toBeNull();
+    expect(colorMath.hexAlpha("rgba(20, 24, 28, 0.10)")).toBeNull();
+  });
+
+  it("knows which colours have no defined contrast ratio", () => {
+    expect(colorMath.isTranslucent("#14181c1a")).toBe(true);
+    expect(colorMath.isTranslucent("#14181cff")).toBe(false);
+    expect(colorMath.isTranslucent("#14181c")).toBe(false);
+    // The resolver's sentinel for an unset slot — no colour to score either.
+    expect(colorMath.isTranslucent("transparent")).toBe(true);
+    // Unreadable is not the same as translucent; `hexToRgb` already answers
+    // "cannot read this", and conflating the two would silently exempt every
+    // typo from the contrast floor.
+    expect(colorMath.isTranslucent("not-a-color")).toBe(false);
+  });
+});
