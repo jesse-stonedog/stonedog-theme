@@ -14,11 +14,74 @@ export function toKebabCase(str: string): string {
 }
 
 /**
+ * The custom-property namespace a host gets for saying nothing.
+ *
+ * Matches `DEFAULT_CSS_VAR_PREFIX` in `stonedog-style`, and must keep matching:
+ * that package's tokens resolve to `var(--hopper-…)` and this one writes those
+ * properties, so a disagreement means every colour is defined under one name
+ * and read under another. Neither half errors; the page simply renders with no
+ * colour at all.
+ *
+ * It stays `"hopper"` for the reason it does over there — HopperGuard's theme
+ * data lives in a database keyed on `--hopper-*`, so moving the DEFAULT is a
+ * data migration (NEH-256), separate from letting a host CHOOSE another one.
+ */
+export const DEFAULT_CSS_VAR_PREFIX = "hopper";
+
+/**
+ * A prefix that can appear between `--` and the rest of a custom-property name.
+ *
+ * CSS idents allow more than this (escapes, non-ASCII); the narrow set is
+ * deliberate. Anything outside it is far likelier to be a mistake — a stray
+ * space, a `--` someone included, an empty string from an unset env var — than
+ * an intentional exotic name.
+ */
+const VALID_CSS_VAR_PREFIX = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;
+
+/**
+ * Reject a prefix that would produce a malformed custom property.
+ *
+ * **This throws rather than falling back to the default, and that is the whole
+ * point.** Both alternatives are silent: an invalid prefix emits properties no
+ * browser will parse, and a fallback emits perfectly valid properties in the
+ * wrong namespace. Either way every component renders with no colour, with no
+ * build error and nothing in the console — the exact failure this package
+ * exists to make impossible. A thrown error names the problem at the one moment
+ * someone can act on it.
+ */
+export function assertValidCssVarPrefix(cssVarPrefix: string): void {
+  if (!VALID_CSS_VAR_PREFIX.test(cssVarPrefix)) {
+    throw new Error(
+      `[stonedog-theme] invalid cssVarPrefix ${JSON.stringify(cssVarPrefix)}: ` +
+        "expected a CSS identifier such as \"hopper\" or \"optima\" — letters, " +
+        "digits, hyphens and underscores, starting with a letter or underscore, " +
+        "and WITHOUT the leading \"--\".",
+    );
+  }
+}
+
+/**
  * Get the CSS variable name for a token + slot.
  * e.g. getCssVarName("boxPrimary", "bg") -> "--hopper-box-primary-bg"
+ *      getCssVarName("boxPrimary", "bg", "optima") -> "--optima-box-primary-bg"
+ *
+ * The prefix is a trailing argument with a default, matching how
+ * `stonedog-style` spells the same idea (`requiredCssCustomProperties(prefix)`).
+ * One concept, one shape, across both halves of the design system.
+ *
+ * **Careful passing this to `Array.map`.** `map` supplies the index as the
+ * second argument, so `names.map(getCssVarName)` would silently become
+ * `getCssVarName(name, 0)`. Here the slot argument sits in between so the
+ * compiler catches it; the font helpers below take the prefix second and are
+ * therefore the ones to watch. Wrap them in an arrow.
  */
-export function getCssVarName(tokenName: string, slot: TokenSlot): string {
-  return `--hopper-${toKebabCase(tokenName)}-${slot}`;
+export function getCssVarName(
+  tokenName: string,
+  slot: TokenSlot,
+  cssVarPrefix: string = DEFAULT_CSS_VAR_PREFIX,
+): string {
+  assertValidCssVarPrefix(cssVarPrefix);
+  return `--${cssVarPrefix}-${toKebabCase(tokenName)}-${slot}`;
 }
 
 /**
@@ -57,17 +120,33 @@ export const MAX_FONT_WEIGHT = 1000;
  * are added, and so the property names the CSS property it feeds. These names
  * are public API from the moment they ship: adding one is backwards-compatible,
  * changing one silently un-styles whatever read it.
+ *
+ * **Do not pass this straight to `Array.map`** — `map` supplies the index as
+ * the second argument, which is now the prefix position, so
+ * `FONT_ROLES.map(getFontFamilyCssVarName)` would ask for `--0-font-family-…`.
+ * The compiler rejects it (number is not a string), which is why the prefix is
+ * typed rather than left loose; write `FONT_ROLES.map((r) => getFontFamilyCssVarName(r))`.
  */
-export function getFontFamilyCssVarName(role: FontRole): string {
-  return `--hopper-font-family-${role}`;
+export function getFontFamilyCssVarName(
+  role: FontRole,
+  cssVarPrefix: string = DEFAULT_CSS_VAR_PREFIX,
+): string {
+  assertValidCssVarPrefix(cssVarPrefix);
+  return `--${cssVarPrefix}-font-family-${role}`;
 }
 
 /**
  * The CSS custom property carrying a weight step's numeric value.
  * e.g. getFontWeightCssVarName("bold") -> "--hopper-font-weight-bold"
+ *
+ * Same `Array.map` caveat as `getFontFamilyCssVarName` above.
  */
-export function getFontWeightCssVarName(step: FontWeightStep): string {
-  return `--hopper-font-weight-${step}`;
+export function getFontWeightCssVarName(
+  step: FontWeightStep,
+  cssVarPrefix: string = DEFAULT_CSS_VAR_PREFIX,
+): string {
+  assertValidCssVarPrefix(cssVarPrefix);
+  return `--${cssVarPrefix}-font-weight-${step}`;
 }
 
 /**

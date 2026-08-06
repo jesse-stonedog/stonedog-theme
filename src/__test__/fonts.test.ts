@@ -69,8 +69,12 @@ describe("the font property names", () => {
     // The reason `--hopper-font-family-body` rather than `--hopper-font-body`.
     // A role called `weight` would otherwise shadow the weight namespace, and
     // the collision would present as one theme value overwriting another.
-    const families = FONT_ROLES.map(getFontFamilyCssVarName);
-    const weights = FONT_WEIGHT_STEPS.map(getFontWeightCssVarName);
+    // Wrapped rather than passed point-free: these take an optional prefix
+    // second (NEH-423) and `map` supplies the index there, so the bare form
+    // asks for `--0-font-family-body`. The compiler rejects it — this shape is
+    // what satisfies it, not a workaround for a false positive.
+    const families = FONT_ROLES.map((role) => getFontFamilyCssVarName(role));
+    const weights = FONT_WEIGHT_STEPS.map((step) => getFontWeightCssVarName(step));
 
     expect(new Set([...families, ...weights]).size).toBe(families.length + weights.length);
   });
@@ -84,8 +88,8 @@ describe("the font property names", () => {
     );
 
     for (const property of [
-      ...FONT_ROLES.map(getFontFamilyCssVarName),
-      ...FONT_WEIGHT_STEPS.map(getFontWeightCssVarName),
+      ...FONT_ROLES.map((role) => getFontFamilyCssVarName(role)),
+      ...FONT_WEIGHT_STEPS.map((step) => getFontWeightCssVarName(step)),
     ]) {
       expect(colours.has(property)).toBe(false);
     }

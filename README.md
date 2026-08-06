@@ -49,6 +49,31 @@ for (const [name, value] of Object.entries(vars)) {
 A theme carries both light and dark modes; `resolveTokensToCssVars` takes the
 mode you want, so switching schemes is re-resolving the same records.
 
+### Choosing a custom-property namespace
+
+Properties are written under `--hopper-*` by default. A host that gave
+`stonedog-style` a different one passes the same value here:
+
+```ts
+// panda.config.ts
+stonedogStylePreset({ cssVarPrefix: "optima" })   // decides what components READ
+
+// at runtime
+resolveTokensToCssVars(tokens, "light", "optima") // decides what the host WRITES
+resolveFontsToCssVars(fontSettings, "optima")     // same value, same element
+```
+
+**These two must agree**, and nothing checks it for you. If they disagree the
+properties are all defined and the components all look somewhere else, so every
+surface renders with no colour — no build error, no console warning, nothing in
+the network tab. Pass the prefix from one constant in your app rather than
+typing it twice.
+
+An unusable prefix (empty, containing a space, or with the `--` already on the
+front) **throws** rather than falling back to the default. A fallback would emit
+a perfectly valid theme in a namespace nothing reads, which is the same
+invisible failure wearing a disguise.
+
 ## Typefaces
 
 A theme's brand is its colours **and** its type, so families and weights resolve
@@ -118,10 +143,12 @@ unshareable in the first place.
 - **Property names are not derivable from token names.** `textPrimary` is
   `--hopper-box-primary-text`, not `--hopper-text-primary`. Read
   `token-registry.ts` rather than guessing.
-- **The custom-property prefix is still `hopper`.** `DEFAULT_CSS_VAR_PREFIX` in
-  `stonedog-style` has not moved, because there is theme data in a database
-  keyed on `--hopper-*` and flipping it is a data migration, not a rename.
-  Tracked separately.
+- **The DEFAULT prefix is still `hopper`, but it is no longer the only one.**
+  Any host can pass its own to the resolvers (see above). What has not moved is
+  `DEFAULT_CSS_VAR_PREFIX` — there is theme data in a database keyed on
+  `--hopper-*`, and flipping the default is a data migration, not a rename.
+  Tracked separately. Choosing a prefix and changing the default are different
+  questions; only the second one is parked.
 - **A token with no matching property renders as nothing, silently** — no build
   error, no console warning. That is the failure mode this package exists to
   make impossible, and it is why the completeness assertion against

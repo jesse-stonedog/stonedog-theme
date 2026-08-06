@@ -10,6 +10,7 @@ import type {
   ThemeFontSettings,
 } from "./types";
 import {
+  DEFAULT_CSS_VAR_PREFIX,
   getCssVarName,
   getFontFamilyCssVarName,
   getFontWeightCssVarName,
@@ -82,14 +83,29 @@ export function resolveTokenSlots(
  *   "--hopper-box-primary-bg": "#3a5ba0"
  *   "--hopper-box-primary-text": "#ffffff"
  *   "--hopper-box-primary-border": "#2a4b90"
+ *
+ * `cssVarPrefix` re-points all of them (NEH-423) — pass `"optima"` and the same
+ * theme emits `--optima-box-primary-bg`. It must match the prefix the host gave
+ * `stonedogStylePreset({ cssVarPrefix })`, because that is what decides which
+ * property each component READS. The two disagreeing is not an error anywhere:
+ * the properties are defined, the components look elsewhere, and every surface
+ * renders with no colour.
+ *
+ * Threaded as an argument rather than held in module state on purpose. A global
+ * would make the emitted namespace depend on import order and on whoever set it
+ * last — and in a process serving two prefixes (a test suite covering both, a
+ * server rendering for two brands) it would be a race whose only symptom is a
+ * page that paints nothing.
  */
 export function resolveTokensToCssVars(
   tokens: ComponentTokenRecord[],
   colorMode: ColorMode,
+  cssVarPrefix: string = DEFAULT_CSS_VAR_PREFIX,
 ): FlatCssVariableMap {
   themeLog().info("[stonedog-theme/resolver] resolveTokensToCssVars", {
     tokenCount: tokens.length,
     colorMode,
+    cssVarPrefix,
   });
   const vars: FlatCssVariableMap = {};
 
@@ -101,13 +117,13 @@ export function resolveTokensToCssVars(
     // semanticVariables.ts works correctly (CSS treats "transparent" as
     // a valid value and won't fall back to the next var()).
     if (bgValue && bgValue !== "transparent") {
-      vars[getCssVarName(token.name, "bg")] = bgValue;
+      vars[getCssVarName(token.name, "bg", cssVarPrefix)] = bgValue;
     }
     if (textValue && textValue !== "transparent") {
-      vars[getCssVarName(token.name, "text")] = textValue;
+      vars[getCssVarName(token.name, "text", cssVarPrefix)] = textValue;
     }
     if (borderValue && borderValue !== "transparent") {
-      vars[getCssVarName(token.name, "border")] = borderValue;
+      vars[getCssVarName(token.name, "border", cssVarPrefix)] = borderValue;
     }
   }
 
@@ -133,14 +149,24 @@ export function resolveTokensToCssVars(
  * these properties with a fallback (`var(--hopper-font-family-body, inherit)`)
  * keeps its own typeface until a theme has an opinion, and a host that consumes
  * none of them is unaffected.
+ *
+ * Takes the same `cssVarPrefix` as `resolveTokensToCssVars`, and for the same
+ * reason — a host merging both maps onto one element needs every property in
+ * one namespace. Pass the same value to both; a theme whose colours land under
+ * `--optima-*` and whose fonts land under `--hopper-*` is half-themed, and the
+ * half that went missing is the silent one.
  */
-export function resolveFontsToCssVars(settings: ThemeFontSettings): FlatCssVariableMap {
+export function resolveFontsToCssVars(
+  settings: ThemeFontSettings,
+  cssVarPrefix: string = DEFAULT_CSS_VAR_PREFIX,
+): FlatCssVariableMap {
   const fonts = settings.fonts ?? {};
   const weights = settings.weights ?? {};
 
   themeLog().info("[stonedog-theme/resolver] resolveFontsToCssVars", {
     roles: FONT_ROLES.filter((role) => fonts[role] !== undefined),
     steps: FONT_WEIGHT_STEPS.filter((step) => weights[step] !== undefined),
+    cssVarPrefix,
   });
 
   const vars: FlatCssVariableMap = {};
@@ -162,7 +188,7 @@ export function resolveFontsToCssVars(settings: ThemeFontSettings): FlatCssVaria
       continue;
     }
 
-    vars[getFontFamilyCssVarName(role)] = stack;
+    vars[getFontFamilyCssVarName(role, cssVarPrefix)] = stack;
   }
 
   for (const step of FONT_WEIGHT_STEPS) {
@@ -177,7 +203,7 @@ export function resolveFontsToCssVars(settings: ThemeFontSettings): FlatCssVaria
       continue;
     }
 
-    vars[getFontWeightCssVarName(step)] = String(weight);
+    vars[getFontWeightCssVarName(step, cssVarPrefix)] = String(weight);
   }
 
   return vars;
@@ -209,6 +235,16 @@ export function googleFontUrls(settings: ThemeFontSettings): string[] {
  * from ComponentToken records.
  *
  * e.g. "--colors-boxBgPrimary": "#3a5ba0"
+ *
+ * **This deliberately takes no `cssVarPrefix`** (NEH-423). `--colors-*` is not
+ * this package's namespace to re-point: it is what HopperGuard's pre-token-layer
+ * CSS reads, written against Panda's own generated names, and HopperGuard is the
+ * only consumer. Prefixing it would emit `--optima-colors-*`, which nothing
+ * anywhere reads — a map full of properties with no reader, produced on purpose,
+ * looking like it works.
+ *
+ * So this is a HopperGuard migration seam that happens to live here, not part of
+ * the portable surface. A host adopting this package should never call it.
  */
 export function emitLegacyAliases(
   tokens: ComponentTokenRecord[],

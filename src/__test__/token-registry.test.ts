@@ -2,8 +2,12 @@
 
 import {
   toKebabCase,
+  assertValidCssVarPrefix,
   getCssVarName,
+  getFontFamilyCssVarName,
+  getFontWeightCssVarName,
   COMPONENT_TOKEN_GROUPS,
+  DEFAULT_CSS_VAR_PREFIX,
   LEGACY_TO_TOKEN_MAP,
   getTokenGroup,
   getTokenGroupsByCategory,
@@ -46,6 +50,62 @@ describe("token-registry", () => {
 
     it("handles multi-segment token names", () => {
       expect(getCssVarName("buttonPrimaryHover", "bg")).toBe("--hopper-button-primary-hover-bg");
+    });
+
+    it("defaults to the hopper namespace", () => {
+      // Pinned rather than assumed. The default is what every existing host
+      // gets for saying nothing, and HopperGuard's stored theme data is keyed
+      // on it — moving it is a data migration (NEH-256), not a rename, so a
+      // change here must be deliberate enough to edit this line.
+      expect(DEFAULT_CSS_VAR_PREFIX).toBe("hopper");
+      expect(getCssVarName("boxPrimary", "bg")).toBe(
+        getCssVarName("boxPrimary", "bg", DEFAULT_CSS_VAR_PREFIX),
+      );
+    });
+
+    it("re-points every slot under a custom prefix", () => {
+      expect(getCssVarName("boxPrimary", "bg", "optima")).toBe("--optima-box-primary-bg");
+      expect(getCssVarName("boxPrimary", "text", "optima")).toBe("--optima-box-primary-text");
+      expect(getCssVarName("boxSecondary", "border", "optima")).toBe(
+        "--optima-box-secondary-border",
+      );
+    });
+  });
+
+  describe("assertValidCssVarPrefix", () => {
+    // A malformed prefix is the one input that fails ENTIRELY silently: the
+    // properties are written, no browser parses them, every component renders
+    // with no colour, and nothing anywhere reports a problem. So this throws,
+    // and these cases are the ones a host realistically gets wrong.
+    it.each(["hopper", "optima", "acme", "_private", "brand-two", "a1"])(
+      "accepts %s",
+      (prefix) => {
+        expect(() => assertValidCssVarPrefix(prefix)).not.toThrow();
+      },
+    );
+
+    it.each([
+      ["", "an empty string, e.g. an unset env var"],
+      ["--hopper", "the leading dashes already included"],
+      ["my theme", "a space"],
+      ["1brand", "a leading digit — not a valid CSS ident"],
+      ["brand.two", "a dot"],
+      ["brand:two", "a colon"],
+    ])("rejects %j (%s)", (prefix) => {
+      expect(() => assertValidCssVarPrefix(prefix)).toThrow(/invalid cssVarPrefix/);
+    });
+
+    it("rejects through the name builders too, not only when called directly", () => {
+      // The assertion lives inside the builders so every caller inherits it —
+      // including `semanticTokenToCssVar` and both resolvers, which is what
+      // makes one guard cover the whole surface.
+      expect(() => getCssVarName("boxPrimary", "bg", "--optima")).toThrow(
+        /invalid cssVarPrefix/,
+      );
+      expect(() => getFontFamilyCssVarName("body", "my theme")).toThrow(
+        /invalid cssVarPrefix/,
+      );
+      expect(() => getFontWeightCssVarName("bold", "")).toThrow(/invalid cssVarPrefix/);
     });
   });
 

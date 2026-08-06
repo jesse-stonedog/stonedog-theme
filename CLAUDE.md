@@ -114,10 +114,42 @@ completeness test has to run against a *populated* theme.
   namespace, and the longer form is what keeps a future role from shadowing a
   weight step. Both are public API the moment they publish — adding a role is
   backwards-compatible, renaming one silently un-styles whatever read it.
-- **The prefix is `hopper`, still.** `DEFAULT_CSS_VAR_PREFIX` in
-  `stonedog-style` has not moved, because HopperGuard's theme data lives in a
-  database keyed on `--hopper-*` and flipping it is a data migration, not a
-  rename. Tracked separately; do not "tidy" it.
+- **The prefix is a resolver ARGUMENT; only the DEFAULT is still `hopper`**
+  (NEH-423). `resolveTokensToCssVars`, `resolveFontsToCssVars`,
+  `semanticTokenToCssVar` and the three name builders all take an optional
+  trailing `cssVarPrefix`, matching how `stonedog-style` spells the same idea
+  (`requiredCssCustomProperties(prefix)`) — one concept, one shape, both halves.
+  `DEFAULT_CSS_VAR_PREFIX` itself has not moved, because HopperGuard's theme
+  data lives in a database keyed on `--hopper-*` and flipping the default is a
+  data migration, not a rename (NEH-256). Do not "tidy" the default; do not
+  reintroduce a hardcoded literal.
+
+  Three things about it that are load-bearing:
+
+  - **It is an argument, never module state.** A global would make the emitted
+    namespace depend on import order and on whoever set it last, and in a
+    process serving two prefixes — a suite covering both, a server rendering
+    for two brands — that is a race whose only symptom is a page with no
+    colour on it.
+  - **The host's two halves must agree.** The preset's `cssVarPrefix` decides
+    what components *read*; the resolver's decides what the host *writes*.
+    Nothing checks that they match, and when they do not, every property is
+    defined and every component looks elsewhere.
+  - **An invalid prefix throws** (`assertValidCssVarPrefix`, called inside the
+    name builders so every caller inherits it). Falling back to the default
+    would emit a valid theme in a namespace nothing reads — the same invisible
+    failure this package exists to prevent, wearing a disguise.
+
+  **Do not pass the font name builders to `Array.map`.** They take the prefix
+  second, which is where `map` puts the index, so `FONT_ROLES.map(getFontFamilyCssVarName)`
+  asks for `--0-font-family-body`. The compiler rejects it (number vs string) —
+  that is why the prefix is typed rather than left loose — but the fix is an
+  arrow wrapper, not a cast.
+- **`emitLegacyAliases` deliberately takes NO prefix.** `--colors-*` is Panda's
+  own generated namespace, read by HopperGuard's pre-token-layer CSS and by
+  nothing else. Prefixing it would produce `--optima-colors-*`, which nothing
+  anywhere reads. It is a HopperGuard migration seam that happens to live here,
+  not part of the portable surface.
 - **`TEXT_BACKGROUND_PAIRS`** in `stonedog-style`'s `semantic-variables.ts`
   encodes which text token is legible against which surface. Components already
   choose colours from it rather than by eye — read it before changing how pairs
