@@ -74,6 +74,51 @@ front) **throws** rather than falling back to the default. A fallback would emit
 a perfectly valid theme in a namespace nothing reads, which is the same
 invisible failure wearing a disguise.
 
+## The theme catalogue
+
+`themes/` holds published themes as `<slug>.theme.json`, and ships with the
+package — so anything installing `stonedog-theme` gets them.
+
+**Each theme's owning product is the source of truth; this is a mirror.** Two
+commands keep them in step, and both are idempotent:
+
+```ts
+import {
+  catalogueThemeSlugs, readCatalogueThemeRecords, toJsonTheme, writeCatalogueTheme,
+} from "stonedog-theme/catalogue";
+import { diffResolvedThemes } from "stonedog-theme";
+
+// pull — replace the product's copy with the published one
+const published = readCatalogueThemeRecords(catalogueDir, "ocean-breeze");
+
+// push — publish the product's current theme
+const { changed } = writeCatalogueTheme(catalogueDir, "ocean-breeze", toJsonTheme(mine, "Ocean Breeze"));
+
+// "would this change anything?" — by resolved properties, not by file bytes
+const differences = diffResolvedThemes({ tokens: published }, { tokens: mine });
+```
+
+`diffResolvedThemes` is the one to reach for when deciding whether a sync is
+needed. Comparing records or files answers a different question: two token sets
+can differ textually and paint identically (the AA contrast floor re-resolves
+text against its background), and a slot moving to `transparent` removes a
+property rather than changing its value, so a whole surface can appear or vanish
+without any single value looking different.
+
+**`stonedog-theme/catalogue` is a separate entry point** because it imports
+`node:fs`. The main entry stays free of it, so importing the resolver into a
+bundled or client-adjacent module graph does not drag the filesystem in.
+
+Every function takes a directory rather than locating the package's own. That is
+partly so the same functions work against a product's private theme directory,
+and partly because a self-locating helper cannot be written once for a package
+built as both ESM and CJS — `import.meta.url` and `__dirname` each exist in only
+one of them. Resolve it yourself:
+
+```ts
+const catalogueDir = join(dirname(require.resolve("stonedog-theme/package.json")), "themes");
+```
+
 ## Typefaces
 
 A theme's brand is its colours **and** its type, so families and weights resolve
