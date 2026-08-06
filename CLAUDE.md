@@ -159,6 +159,23 @@ completeness test has to run against a *populated* theme.
   regex capture group is therefore `T | undefined`: handle the missing case —
   `null`/skip/throw, whatever that function already does for input it cannot
   read — rather than reaching for `!`, `as`, or a widened type.
+- **Whatever the format ACCEPTS, the maths must PARSE** (NEH-424). `json-theme.ts`'s
+  `COLOR` regex has always allowed 8-char hex, and `hexToRgb` rejected it on
+  length — so `getLuminance` hit its `0` fallback and every translucent colour
+  scored **identically to pure black**. A 10% black overlay reported a flawless
+  21:1 against white, and a contrast gate reading that would pass it and say so.
+  Worse than NEH-285's version of the same bug, because the wrong answer was not
+  "no colour" but a confident, plausible number. When adding a notation to that
+  regex, add it to `color-math.ts` in the same PR, and assert the two agree.
+- **A translucent colour has no contrast ratio, and the resolver declines to
+  invent one.** What it renders as depends on the backdrop, which nothing here
+  can see. `isTranslucent` gates the AA floor in `resolveTokenSlots`: the pair is
+  skipped with a warning rather than the text being rewritten from a number
+  describing an opaque shade nobody is looking at. `getContrastRatio` still
+  returns a number for such a pair — as-if-opaque, useful as an approximation,
+  never a basis for changing anyone's colour. The guard keys on **alpha, not on
+  string length**: `#rrggbbff` is an ordinary opaque colour and gets no
+  exemption, or writing one would be a way to opt out of the contrast floor.
 - **There is exactly one hex parser: `src/color-math.ts`.** `contrast.ts`
   re-exports `hexToRgb` / `rgbToHex` / `getLuminance` from it and `extraction.ts`
   imports them; do not add a local copy to a third module. `extraction.ts` used

@@ -7,6 +7,7 @@ import {
 } from "../resolver";
 import { COMPONENT_TOKEN_GROUPS, LEGACY_TO_TOKEN_MAP, getCssVarName } from "../token-registry";
 import { getContrastRatio } from "../contrast";
+import { setThemeLogger } from "../logger";
 import type { ComponentTokenRecord } from "../types";
 
 /**
@@ -199,6 +200,10 @@ describe("resolver", () => {
   describe("AA text-contrast enforcement", () => {
     const COLOR_MODES = ["light", "dark"] as const;
 
+    // Restore silence: the logger is module-level, so a spy left installed
+    // leaks into every later suite in this file.
+    afterEach(() => setThemeLogger());
+
     function ratio(text: string, bg: string): number {
       return getContrastRatio(text, bg);
     }
@@ -249,6 +254,52 @@ describe("resolver", () => {
         expect(vars["--hopper-box-primary-text"]).toBe(expected);
       },
     );
+
+    it("declines the AA floor for a translucent slot, and says so (NEH-424)", () => {
+      // A translucent surface has no defined contrast ratio — what it renders
+      // as depends on whatever is behind it, which the resolver cannot see. So
+      // the floor declines rather than rewriting the colour from a number
+      // describing an opaque shade nobody is looking at.
+      //
+      // **Asserted on the WARNING, not on the output colour**, and that is the
+      // whole point of this test. Before the fix the text also came through
+      // unchanged — but for the opposite reason: `hexToRgb` rejected the 8-char
+      // bg, luminance fell back to 0, white-on-that scored a flawless 21:1, and
+      // the floor saw nothing wrong. Same output, opposite meaning. Asserting
+      // the colour alone would have passed against the bug it was written for.
+      const warn = jest.fn();
+      setThemeLogger({ info: () => {}, warn });
+
+      const token = mockToken({
+        name: "boxPrimary",
+        bgLight: "#14181c1a",
+        textLight: "#ffffff",
+      });
+      const vars = resolveTokensToCssVars([token], "light");
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("translucent"),
+        expect.objectContaining({ token: "boxPrimary" }),
+      );
+      expect(vars["--hopper-box-primary-bg"]).toBe("#14181c1a");
+      expect(vars["--hopper-box-primary-text"]).toBe("#ffffff");
+    });
+
+    it("still enforces the floor when an 8-char colour is fully opaque", () => {
+      // The guard keys on alpha, not on "8 characters". Otherwise writing
+      // `#rrggbbff` would be a way to opt out of the contrast floor entirely.
+      const token = mockToken({
+        name: "boxPrimary",
+        bgLight: "#ffffffff",
+        textLight: "#eeeeee",
+      });
+      const vars = resolveTokensToCssVars([token], "light");
+
+      expect(vars["--hopper-box-primary-text"]).not.toBe("#eeeeee");
+      expect(
+        getContrastRatio(vars["--hopper-box-primary-text"] as string, "#ffffffff"),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
 
     it("does not touch text when bg is transparent (palette fallback owns the pair)", () => {
       const token = mockToken({
