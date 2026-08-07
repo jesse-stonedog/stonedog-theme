@@ -1,4 +1,4 @@
-# stonedog-theme
+# @stonedogcode/theme
 
 The theme layer for [`stonedog-style`](https://github.com/stonedog-code/stonedog-style).
 
@@ -24,7 +24,7 @@ migration logic do not.
 ## Install
 
 ```bash
-npm install stonedog-theme
+npm install @stonedogcode/theme
 ```
 
 Unlike `stonedog-style`, which ships TypeScript source so a consumer's Panda
@@ -35,7 +35,7 @@ it: it emits no CSS and defines no components, it produces a
 ## Usage
 
 ```ts
-import { parseJsonTheme, resolveTokensToCssVars } from "stonedog-theme"
+import { parseJsonTheme, resolveTokensToCssVars } from "@stonedogcode/theme"
 
 const tokens = parseJsonTheme(myThemeJson)          // -> ComponentTokenRecord[]
 const vars = resolveTokensToCssVars(tokens, "light") // -> { "--hopper-box-primary-bg": "#3a5ba0", ... }
@@ -77,7 +77,7 @@ invisible failure wearing a disguise.
 ## The theme catalogue
 
 `themes/` holds published themes as `<slug>.theme.json`, and ships with the
-package — so anything installing `stonedog-theme` gets them.
+package — so anything installing `@stonedogcode/theme` gets them.
 
 **Each theme's owning product is the source of truth; this is a mirror.** Two
 commands keep them in step, and both are idempotent:
@@ -85,8 +85,8 @@ commands keep them in step, and both are idempotent:
 ```ts
 import {
   catalogueThemeSlugs, readCatalogueThemeRecords, toJsonTheme, writeCatalogueTheme,
-} from "stonedog-theme/catalogue";
-import { diffResolvedThemes } from "stonedog-theme";
+} from "@stonedogcode/theme/catalogue";
+import { diffResolvedThemes } from "@stonedogcode/theme";
 
 // pull — replace the product's copy with the published one
 const published = readCatalogueThemeRecords(catalogueDir, "ocean-breeze");
@@ -105,7 +105,7 @@ text against its background), and a slot moving to `transparent` removes a
 property rather than changing its value, so a whole surface can appear or vanish
 without any single value looking different.
 
-**`stonedog-theme/catalogue` is a separate entry point** because it imports
+**`@stonedogcode/theme/catalogue` is a separate entry point** because it imports
 `node:fs`. The main entry stays free of it, so importing the resolver into a
 bundled or client-adjacent module graph does not drag the filesystem in.
 
@@ -116,7 +116,7 @@ built as both ESM and CJS — `import.meta.url` and `__dirname` each exist in on
 one of them. Resolve it yourself:
 
 ```ts
-const catalogueDir = join(dirname(require.resolve("stonedog-theme/package.json")), "themes");
+const catalogueDir = join(dirname(require.resolve("@stonedogcode/theme/package.json")), "themes");
 ```
 
 ## Typefaces
@@ -125,7 +125,7 @@ A theme's brand is its colours **and** its type, so families and weights resolve
 through the same seam rather than being applied by hand alongside it:
 
 ```ts
-import { parseJsonThemeFonts, resolveFontsToCssVars, googleFontUrls } from "stonedog-theme"
+import { parseJsonThemeFonts, resolveFontsToCssVars, googleFontUrls } from "@stonedogcode/theme"
 
 const fonts = parseJsonThemeFonts(myThemeJson)
 resolveFontsToCssVars(fonts)
@@ -162,7 +162,7 @@ Because the point of a themeable system is that someone *else* picks the
 colours, the package checks the result rather than trusting it:
 
 ```ts
-import { getContrastRatio, getWCAGLevel, validateComponentTokenContrast } from "stonedog-theme"
+import { getContrastRatio, getWCAGLevel, validateComponentTokenContrast } from "@stonedogcode/theme"
 
 getContrastRatio("#3a5ba0", "#ffffff")   // 7.02
 getWCAGLevel(7.02)                        // "AAA"
