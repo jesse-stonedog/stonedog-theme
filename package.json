@@ -1,5 +1,5 @@
 {
-  "name": "stonedog-theme",
+  "name": "@stonedogcode/theme",
   "version": "0.3.0",
   "description": "The theme layer for stonedog-style: component tokens, light/dark resolution, WCAG contrast validation, and the CSS custom properties a host must define.",
   "license": "Apache-2.0",
@@ -7,6 +7,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stonedog-code/stonedog-theme.git"
+  },
+  "//publishConfig": "A SCOPED package defaults to access: restricted. Publishing one without this succeeds, prints nothing unusual, and then 404s for every consumer — which reads as a missing package rather than as a private one. It was not needed while the name was unscoped (those default to public), so it is new here and it is the single thing most likely to be forgotten in a scope migration.",
+  "publishConfig": {
+    "access": "public"
   },
   "type": "module",
   "sideEffects": false,

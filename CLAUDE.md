@@ -1,4 +1,4 @@
-# stonedog-theme — the theme layer for stonedog-style
+# @stonedogcode/theme — the theme layer for stonedog-style
 
 **Repo tier.** Machine-wide conventions (branching, PR rules, the Linear
 protocol, Node/nvm) live in `~/.claude/CLAUDE.md` and apply here as written.
@@ -26,7 +26,7 @@ grant, and you can only grant what is yours.
 
 ## Published on npm
 
-`npm install stonedog-theme` — **0.1.0, published 2026-08-03** under the npm
+`npm install @stonedogcode/theme` — **0.1.0, published 2026-08-03** under the npm
 account `stonedogcode`, alongside `stonedog-style` at the same version.
 
 Unlike `stonedog-style`, this package ships a **built `dist/`**, so a consumer

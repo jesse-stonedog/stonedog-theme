@@ -7,7 +7,7 @@
  * does not — RozCards imports `parseJsonTheme` from a Next.js server component
  * that sits in the same module graph as client code, and pulling `fs` into that
  * graph is a bundler error rather than a runtime one. So the catalogue ships as
- * `stonedog-theme/catalogue` and the resolver half stays isomorphic.
+ * `@stonedogcode/theme/catalogue` and the resolver half stays isomorphic.
  *
  * ## Why every function takes a directory
  *
@@ -31,7 +31,7 @@
  * import { createRequire } from "node:module";
  *
  * const require = createRequire(import.meta.url);
- * const catalogueDir = join(dirname(require.resolve("stonedog-theme/package.json")), "themes");
+ * const catalogueDir = join(dirname(require.resolve("@stonedogcode/theme/package.json")), "themes");
  * ```
  */
 
@@ -71,7 +71,7 @@ const VALID_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export function assertValidThemeSlug(slug: string): void {
   if (!VALID_SLUG.test(slug)) {
     throw new Error(
-      `[stonedog-theme] invalid theme slug ${JSON.stringify(slug)}: ` +
+      `[@stonedogcode/theme] invalid theme slug ${JSON.stringify(slug)}: ` +
         'expected lowercase words joined by single hyphens, e.g. "ocean-breeze".',
     );
   }
@@ -142,14 +142,14 @@ export function readCatalogueTheme(dir: string, slug: string): JsonTheme {
     parsed = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
     throw new Error(
-      `[stonedog-theme] could not read ${path}: ${(error as Error).message}`,
+      `[@stonedogcode/theme] could not read ${path}: ${(error as Error).message}`,
     );
   }
 
   const problems = validateJsonTheme(parsed);
   if (problems.length > 0) {
     throw new JsonThemeError(
-      `[stonedog-theme] ${path} is not a valid theme`,
+      `[@stonedogcode/theme] ${path} is not a valid theme`,
       problems,
     );
   }
@@ -243,7 +243,7 @@ export function writeCatalogueTheme(
     // corrupted is a bad file somebody has to notice; refusing to write one is
     // the only point at which it is cheap.
     throw new JsonThemeError(
-      `[stonedog-theme] refusing to write an invalid theme to ${path}`,
+      `[@stonedogcode/theme] refusing to write an invalid theme to ${path}`,
       problems,
     );
   }

@@ -2,7 +2,7 @@
 # Copyright (C) 2026 StoneDogCode L.L.C.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Publish stonedog-theme to npm, end to end.
+# Publish @stonedogcode/theme to npm, end to end.
 #
 #   npm run publish:stonedog-theme
 #
@@ -51,7 +51,7 @@
 # works.
 set -euo pipefail
 
-PACKAGE_NAME="stonedog-theme"
+PACKAGE_NAME="@stonedogcode/theme"
 # Sanity floor for the tarball. The real count is ~20 (dist ESM + CJS + both
 # .d.ts flavours + maps, themes/, README, LICENSE, package.json). Set well
 # below that so ordinary growth does not trip it, and far above what a package
@@ -185,8 +185,12 @@ echo "  ($FILE_COUNT files total)"
 # ---------------------------------------------------------------------------
 # 7. Publish. npm prompts for the OTP here.
 #
-# `--access public` is explicit: this package has no `publishConfig`, and being
-# wrong about it is not recoverable on that version number.
+# `--access public` is explicit, and now belt-and-braces: the name is SCOPED as
+# of NEH-482, and a scoped package defaults to access: restricted. Publishing
+# one privately succeeds, prints nothing unusual, and then 404s for every
+# consumer — indistinguishable from a package that was never published. So the
+# flag is here AND `publishConfig.access` is in package.json; being wrong about
+# it is not recoverable on that version number.
 # ---------------------------------------------------------------------------
 say "Publishing $PACKAGE_NAME@$VERSION — npm will ask for your 2FA code"
 npm publish --access public

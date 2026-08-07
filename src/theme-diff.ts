@@ -18,7 +18,7 @@
  *
  * Pure, no filesystem — this lives in the main entry so a consumer can use it
  * without pulling `node:fs` into a bundler's graph. The catalogue's own
- * read/write half is `stonedog-theme/catalogue`.
+ * read/write half is `@stonedogcode/theme/catalogue`.
  */
 
 import { resolveTokensToCssVars, resolveFontsToCssVars } from "./resolver";
